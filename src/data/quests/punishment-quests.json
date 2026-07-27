@@ -1,0 +1,112 @@
+[
+  {
+    "key": "npc-mode-one-minute",
+    "title": "NPC üzemmód",
+    "description": "A vőlegény egy percen keresztül viselkedjen videojátékos NPC-ként.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 60,
+    "fallbackImageSeed": "npc-mode"
+  },
+  {
+    "key": "ten-push-ups",
+    "title": "Tíz fekvőtámasz",
+    "description": "A vőlegény végezzen el tíz, számára biztonságosan teljesíthető fekvőtámaszt.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "COUNTER",
+    "targetCount": 10,
+    "durationSeconds": null,
+    "fallbackImageSeed": "ten-push-ups"
+  },
+  {
+    "key": "five-nice-things-about-bride",
+    "title": "Romantikus helyreigazítás",
+    "description": "A vőlegény mondjon öt különböző, kedves és konkrét dolgot a menyasszonyról.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "COUNTER",
+    "targetCount": 5,
+    "durationSeconds": null,
+    "fallbackImageSeed": "five-nice-things"
+  },
+  {
+    "key": "thirty-second-chicken-dance",
+    "title": "Csirketánc",
+    "description": "A vőlegény adjon elő egy 30 másodperces csirketáncot.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 30,
+    "fallbackImageSeed": "chicken-dance"
+  },
+  {
+    "key": "three-tongue-twisters",
+    "title": "Nyelvtörő próba",
+    "description": "A vőlegény mondjon el három különböző nyelvtörőt hibázás nélkül.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "COUNTER",
+    "targetCount": 3,
+    "durationSeconds": null,
+    "fallbackImageSeed": "tongue-twisters"
+  },
+  {
+    "key": "wall-sit-thirty-seconds",
+    "title": "Falnál ülés",
+    "description": "A vőlegény tartson ki 30 másodpercig falnál ülő helyzetben, amennyiben ez számára biztonságos.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 30,
+    "fallbackImageSeed": "wall-sit"
+  },
+  {
+    "key": "sing-childrens-song",
+    "title": "Gyerekdal teljes átéléssel",
+    "description": "A vőlegény énekeljen el legalább 30 másodpercet egy ismert gyerekdalból teljes átéléssel.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 30,
+    "fallbackImageSeed": "childrens-song"
+  },
+  {
+    "key": "animal-impressions",
+    "title": "Állathangok",
+    "description": "A vőlegény utánozzon öt különböző állatot, a társaság pedig találja ki őket.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "COUNTER",
+    "targetCount": 5,
+    "durationSeconds": null,
+    "fallbackImageSeed": "animal-impressions"
+  },
+  {
+    "key": "slow-motion-one-minute",
+    "title": "Lassított felvétel",
+    "description": "A vőlegény egy percen keresztül csak lassított mozgással közlekedhet és gesztikulálhat.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 60,
+    "fallbackImageSeed": "slow-motion"
+  },
+  {
+    "key": "dramatic-weather-report",
+    "title": "Drámai időjárás-jelentés",
+    "description": "A vőlegény tartson legalább 30 másodperces drámai időjárás-jelentést a helyszín aktuális állapotáról.",
+    "points": 10,
+    "type": "PUNISHMENT",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 30,
+    "fallbackImageSeed": "dramatic-weather-report"
+  }
+]

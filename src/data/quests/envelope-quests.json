@@ -1,0 +1,112 @@
+[
+  {
+    "key": "english-only-five-minutes",
+    "title": "Öt percig csak angolul",
+    "description": "A vőlegény öt percen keresztül kizárólag angolul beszélhet. Ha magyarul megszólal, a feladatot újra kell kezdeni.",
+    "points": 20,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 300,
+    "fallbackImageSeed": "english-only"
+  },
+  {
+    "key": "dance-without-music",
+    "title": "Tánc zene nélkül",
+    "description": "A vőlegény táncoljon 30 másodpercig hallható zene nélkül.",
+    "points": 20,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 30,
+    "fallbackImageSeed": "dance-without-music"
+  },
+  {
+    "key": "according-to-my-wife-five-minutes",
+    "title": "A feleségem szerint",
+    "description": "A vőlegény öt percen keresztül minden mondatát ezzel kezdje: „A feleségem szerint…”",
+    "points": 25,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 300,
+    "fallbackImageSeed": "according-to-my-wife"
+  },
+  {
+    "key": "speak-like-a-king",
+    "title": "Királyi beszéd",
+    "description": "A vőlegény három percen keresztül királyként beszéljen, és mindenkit alattvalóként szólítson meg.",
+    "points": 20,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 180,
+    "fallbackImageSeed": "speak-like-king"
+  },
+  {
+    "key": "no-first-names-five-minutes",
+    "title": "Tilos a keresztnevek használata",
+    "description": "Öt percen keresztül a vőlegény senkit sem szólíthat a keresztnevén.",
+    "points": 20,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 300,
+    "fallbackImageSeed": "no-first-names"
+  },
+  {
+    "key": "narrate-every-action",
+    "title": "Élő narrátor",
+    "description": "A vőlegény két percen keresztül hangosan narrálja minden mozdulatát és cselekedetét.",
+    "points": 20,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 120,
+    "fallbackImageSeed": "live-narrator"
+  },
+  {
+    "key": "compliment-every-player",
+    "title": "Bók minden játékosnak",
+    "description": "A vőlegény mondjon egy különböző, kedves bókot a társaság minden jelenlévő tagjának.",
+    "points": 25,
+    "type": "ENVELOPE",
+    "completionMode": "SIMPLE",
+    "targetCount": null,
+    "durationSeconds": null,
+    "fallbackImageSeed": "compliment-every-player"
+  },
+  {
+    "key": "walk-like-robot",
+    "title": "Robot üzemmód",
+    "description": "A vőlegény két percen keresztül csak robotmozgással közlekedhet.",
+    "points": 20,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 120,
+    "fallbackImageSeed": "robot-walk"
+  },
+  {
+    "key": "rhyme-every-sentence",
+    "title": "Rímkényszer",
+    "description": "A vőlegény két percen keresztül próbálja rímmel befejezni minden mondatát.",
+    "points": 25,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 120,
+    "fallbackImageSeed": "rhyme-every-sentence"
+  },
+  {
+    "key": "movie-trailer-voice",
+    "title": "Filmelőzetes hang",
+    "description": "A vőlegény két percen keresztül mély filmelőzetes-narrátor hangon beszéljen.",
+    "points": 20,
+    "type": "ENVELOPE",
+    "completionMode": "TIMER",
+    "targetCount": null,
+    "durationSeconds": 120,
+    "fallbackImageSeed": "movie-trailer-voice"
+  }
+]

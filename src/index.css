@@ -1,0 +1,118 @@
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
+
+:root {
+  font-family: "Press Start 2P", monospace;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color: #e7efff;
+  background:
+    linear-gradient(180deg, #0b0f1a 0%, #12182a 100%);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+  -webkit-text-size-adjust: 100%;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, #0b0f1a 0%, #12182a 100%);
+  color: #e7efff;
+}
+
+a {
+  color: #8eabdf;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #b8ccf1;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  background: #6e8ec9;
+  color: #ffffff;
+  border: 3px solid #8eabdf;
+  padding: 12px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 #05070d;
+  transition: transform 0.05s ease;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+button:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #05070d;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input,
+select,
+textarea {
+  background: #0f1524;
+  color: #e7efff;
+  border: 3px solid #4c648d;
+  border-radius: 4px;
+  padding: 12px;
+  box-shadow: inset 2px 2px 0 #05070d;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8597bb;
+}
+
+h1,
+h2,
+h3 {
+  color: #e7efff;
+  text-shadow: 2px 2px 0 #05070d;
+}
+
+p,
+small,
+label {
+  color: #cbd8f4;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #12182a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4c648d;
+  border: 2px solid #12182a;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6e8ec9;
+}
