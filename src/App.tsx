@@ -12,10 +12,12 @@ import "./App.css";
 import XpEvolution from "./components/XpEvolution";
 import ScrollToTopButton from "./components/ScrollToTopButton";
 import QuestCompleteAnimation from "./components/QuestCompleteAnimation";
-import GroomGameView from "./components/GroomGameView";
 import RoundCounterPanel from "./components/RoundCounterPanel";
 import SlotMachine from "./components/SlotMachine";
 import SurvivorDraw from "./components/SurvivorDraw";
+import GroomGameView from "./components/GroomGameView";
+import ArenaPanel from "./components/arena/ArenaPanel";
+import ChallengePopup from "./components/arena/ChallengePopup";
 
 import {
   createRoom,
@@ -30,6 +32,8 @@ import {
 import {
   addHuntPoints,
   addPlayer,
+  ensureGroomPlayer,
+  setPlayerPresence,
   subscribePlayers
 } from "./services/playerService";
 
@@ -71,6 +75,14 @@ interface PlayerView {
   slotPointsWon: number;
   slotJackpots: number;
   joinedAt: string;
+  inventory: { itemId: string; quantity: number }[];
+  present: boolean;
+  pvpWins: number;
+  pvpLosses: number;
+  pvpPointsWon: number;
+  pveWins: number;
+  pveLosses: number;
+  isGroom: boolean;
 }
 
 interface CompletionAnimationState {
@@ -90,6 +102,10 @@ type GameTab =
   | "ROUNDS"
   | "SLOT"
   | "DRAW"
+  | "SHOP"
+  | "INVENTORY"
+  | "PVP"
+  | "PVE"
   | "COMPLETED"
   | "ADD";
 
@@ -98,8 +114,8 @@ const SESSION_PLAYER_NAME = "qbm-player-name";
 const SESSION_VIEW_MODE = "qbm-view-mode";
 
 const GROOM_REWARD_POINTS = 10;
-const GROOM_MIN_WAIT_MS = 45 * 1000;
-const GROOM_MAX_WAIT_MS = 100 * 1000;
+const GROOM_MIN_WAIT_MS = 120 * 1000;
+const GROOM_MAX_WAIT_MS = 240 * 1000;
 const GROOM_VISIBLE_MS = 7000;
 
 const theme = {
@@ -179,29 +195,32 @@ function getCompletionModeLabel(
 
 function App() {
   const [viewMode, setViewMode] = useState<AppViewMode>(
-    (localStorage.getItem(SESSION_VIEW_MODE) as AppViewMode | null) ?? "COMPANION"
+    (sessionStorage.getItem(SESSION_VIEW_MODE) as AppViewMode | null) ?? "COMPANION"
   );
 
   const [roomGroomName, setRoomGroomName] = useState("Vőlegény");
   const [roomTargetXp, setRoomTargetXp] = useState("500");
+  const [roomStartingPoints, setRoomStartingPoints] = useState("500");
 
   const [createdRoomCode, setCreatedRoomCode] =
     useState("");
 
   const [joinCode, setJoinCode] = useState(
-    localStorage.getItem(SESSION_ROOM_CODE) ?? ""
+    sessionStorage.getItem(SESSION_ROOM_CODE) ?? ""
   );
 
   const [joinedRoom, setJoinedRoom] =
     useState<Room | null>(null);
 
   const [playerName, setPlayerName] = useState(
-    localStorage.getItem(SESSION_PLAYER_NAME) ?? ""
+    sessionStorage.getItem(SESSION_PLAYER_NAME) ?? ""
   );
 
   const [activePlayerName, setActivePlayerName] =
     useState(
-      localStorage.getItem(SESSION_PLAYER_NAME) ?? ""
+      ((sessionStorage.getItem(SESSION_VIEW_MODE) as AppViewMode | null) ?? "COMPANION") === "GROOM"
+        ? ""
+        : sessionStorage.getItem(SESSION_PLAYER_NAME) ?? ""
     );
 
   const [players, setPlayers] =
@@ -297,6 +316,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuOpen]);
+
+  useEffect(() => {
     if (!joinedRoom || !activePlayerName || viewMode !== "COMPANION") {
       setGroomVisible(false);
       return;
@@ -366,8 +400,15 @@ function App() {
   );
 
   const activeNormalQuest = useMemo(() => {
-    if (!joinedRoom?.activeNormalQuestId) return null;
-    return quests.find((quest) => quest.id === joinedRoom.activeNormalQuestId) ?? null;
+    if (!joinedRoom?.activeNormalQuestId) {
+      return null;
+    }
+
+    return (
+      quests.find(
+        (quest) => quest.id === joinedRoom.activeNormalQuestId
+      ) ?? null
+    );
   }, [joinedRoom?.activeNormalQuestId, quests]);
 
   const activeEnvelopeQuest = useMemo(() => {
@@ -414,6 +455,19 @@ function App() {
           activePlayerName.toLocaleLowerCase("hu-HU")
       ) ?? null,
     [players, activePlayerName]
+  );
+
+  const groomPlayer = useMemo(
+    () =>
+      joinedRoom
+        ? players.find((player) => player.isGroom) ??
+          players.find(
+            (player) =>
+              player.name.toLocaleLowerCase("hu-HU") ===
+              joinedRoom.groomName.toLocaleLowerCase("hu-HU")
+          ) ?? null
+        : null,
+    [players, joinedRoom]
   );
 
   const rankedPlayers = useMemo(
@@ -567,17 +621,20 @@ function App() {
       const room = await createRoom(
         "Legénybúcsú RPG",
         roomGroomName,
-        Number(roomTargetXp)
+        Number(roomTargetXp),
+        Math.max(0, Number(roomStartingPoints) || 0)
       );
 
       setViewMode("COMPANION");
-      localStorage.setItem(SESSION_VIEW_MODE, "COMPANION");
+      sessionStorage.setItem(SESSION_VIEW_MODE, "COMPANION");
+
+      await ensureGroomPlayer(room.id, room.groomName);
 
       setCreatedRoomCode(room.roomCode);
       setJoinCode(room.roomCode);
       setJoinedRoom(room);
 
-      localStorage.setItem(
+      sessionStorage.setItem(
         SESSION_ROOM_CODE,
         room.roomCode
       );
@@ -622,9 +679,16 @@ function App() {
       setJoinedRoom(room);
       setJoinCode(room.roomCode);
       setViewMode(requestedMode);
-      localStorage.setItem(SESSION_VIEW_MODE, requestedMode);
+      sessionStorage.setItem(SESSION_VIEW_MODE, requestedMode);
+      if (requestedMode === "GROOM") {
+        setPlayerName(room.groomName);
+        setActivePlayerName("");
+        setActiveTab("NORMAL");
+        sessionStorage.removeItem(SESSION_PLAYER_NAME);
+        await ensureGroomPlayer(room.id, room.groomName);
+      }
 
-      localStorage.setItem(
+      sessionStorage.setItem(
         SESSION_ROOM_CODE,
         room.roomCode
       );
@@ -642,22 +706,7 @@ function App() {
   }
 
   async function handleJoinAsPlayer() {
-    useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [menuOpen]);
-
-  if (!joinedRoom) {
+    if (!joinedRoom) {
       alert("Előbb csatlakozz egy játékhoz.");
       return;
     }
@@ -678,17 +727,20 @@ function App() {
     try {
       setLoading(true);
 
-      if (!duplicatePlayer) {
-        await addPlayer(
-          joinedRoom.id,
-          normalizedName
-        );
+      const isGroomName = normalizedName.toLocaleLowerCase("hu-HU") === joinedRoom.groomName.toLocaleLowerCase("hu-HU");
+      if (isGroomName) {
+        await ensureGroomPlayer(joinedRoom.id, joinedRoom.groomName);
+      } else if (!duplicatePlayer) {
+        await addPlayer(joinedRoom.id, normalizedName, joinedRoom.startingPoints);
+      } else {
+        const existingPlayer = players.find((player) => player.name.toLocaleLowerCase("hu-HU") === normalizedName.toLocaleLowerCase("hu-HU"));
+        if (existingPlayer) await setPlayerPresence(joinedRoom.id, existingPlayer.id, true);
       }
 
       setActivePlayerName(normalizedName);
       setPlayerName(normalizedName);
 
-      localStorage.setItem(
+      sessionStorage.setItem(
         SESSION_PLAYER_NAME,
         normalizedName
       );
@@ -1319,6 +1371,9 @@ function App() {
   }
 
   function handleLeaveRoom() {
+    if (joinedRoom && activePlayer) {
+      void setPlayerPresence(joinedRoom.id, activePlayer.id, false);
+    }
     setJoinedRoom(null);
     setPlayers([]);
     setQuests([]);
@@ -1329,19 +1384,19 @@ function App() {
     setGroomVisible(false);
     setGroomCycle(0);
 
-    localStorage.removeItem(
+    sessionStorage.removeItem(
       SESSION_ROOM_CODE
     );
 
-    localStorage.removeItem(
+    sessionStorage.removeItem(
       SESSION_PLAYER_NAME
     );
-    localStorage.removeItem(SESSION_VIEW_MODE);
+    sessionStorage.removeItem(SESSION_VIEW_MODE);
   }
 
   useEffect(() => {
     const savedRoomCode =
-      localStorage.getItem(
+      sessionStorage.getItem(
         SESSION_ROOM_CODE
       );
 
@@ -1740,6 +1795,7 @@ function App() {
           <div className="landing-form-grid">
             <label><span>Vőlegény neve</span><input value={roomGroomName} onChange={(event) => setRoomGroomName(event.target.value)} maxLength={30} /></label>
             <label><span>Győzelmi cél (XP)</span><input type="number" min={100} max={5000} step={50} value={roomTargetXp} onChange={(event) => setRoomTargetXp(event.target.value)} /></label>
+            <label><span>Kezdő pont (kísérők)</span><input type="number" min={0} value={roomStartingPoints} onChange={(event) => setRoomStartingPoints(String(Math.max(0, Number(event.target.value) || 0)))} /></label>
           </div>
           <button type="button" onClick={handleCreateRoom} disabled={loading}>{loading ? "Létrehozás..." : "Új játék létrehozása"}</button>
           {createdRoomCode && <p>Szobakód: <strong className="pixel-code">{createdRoomCode}</strong></p>}
@@ -1769,16 +1825,123 @@ function App() {
   }
 
   if (viewMode === "GROOM") {
+    const groomCertificateUnlocked = joinedRoom.currentXp >= joinedRoom.targetXp;
+    const groomMenuItems = [
+      ["NORMAL", "🎯", groomCertificateUnlocked ? "Aktuális feladat & kalandlevél" : "Aktuális feladat"],
+      ["SHOP", "🛒", "Shop"],
+      ["INVENTORY", "🎒", "Inventory"],
+      ["PVP", "⚔️", "PvP Aréna"],
+      ["PVE", "👹", "PvE Aréna"],
+      ["SLOT", "🎰", "Kaszinó"]
+    ] as const;
+
     return (
-<GroomGameView
-  room={joinedRoom}
-  quests={quests}
-  players={players}
-  activeNormalQuest={activeNormalQuest}
-  activeEnvelopeQuest={activeEnvelopeQuest}
-  activePunishmentQuest={activePunishmentQuest}
-  onLeave={handleLeaveRoom}
-/>    );
+      <div className="groom-shell">
+        <header className="groom-menu-header">
+          <button
+            type="button"
+            className="hamburger-button"
+            aria-label="Vőlegény menü megnyitása"
+            aria-expanded={menuOpen}
+            aria-controls="groom-menu"
+            onClick={() => setMenuOpen(true)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        </header>
+
+        {menuOpen && (
+          <div
+            className="hamburger-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setMenuOpen(false);
+            }}
+          >
+            <aside id="groom-menu" className="hamburger-drawer" aria-label="Vőlegény menü">
+              <div className="hamburger-drawer__header">
+                <div>
+                  <small>Quest Before Marriage</small>
+                  <strong>🤴 Vőlegény menü</strong>
+                </div>
+                <button type="button" className="hamburger-close" aria-label="Menü bezárása" onClick={() => setMenuOpen(false)}>✕</button>
+              </div>
+
+              <div className="hamburger-room-summary">
+                <span>Szoba</span>
+                <strong>{joinedRoom.roomCode}</strong>
+                <span>{joinedRoom.currentXp} / {joinedRoom.targetXp} XP</span>
+              </div>
+
+              <nav className="hamburger-menu-list">
+                {groomMenuItems.map(([tab, icon, label]) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={activeTab === tab ? "is-active" : ""}
+                    onClick={() => { setActiveTab(tab); setMenuOpen(false); }}
+                  >
+                    <span aria-hidden="true">{icon}</span>
+                    <span>{label}</span>
+                    {activeTab === tab && <b>●</b>}
+                  </button>
+                ))}
+              </nav>
+
+              <button
+                type="button"
+                className="hamburger-logout"
+                onClick={() => { setMenuOpen(false); handleLeaveRoom(); }}
+              >
+                🚪 Kilépés a szobából
+              </button>
+            </aside>
+          </div>
+        )}
+
+        {groomPlayer && (
+          <ChallengePopup
+            roomId={joinedRoom.id}
+            playerId={groomPlayer.id}
+            onOpenArena={() => setActiveTab("PVP")}
+          />
+        )}
+
+        {activeTab === "NORMAL" && (
+          <GroomGameView
+            room={joinedRoom}
+            quests={quests}
+            players={players}
+            activeNormalQuest={activeNormalQuest}
+            activeEnvelopeQuest={activeEnvelopeQuest}
+            activePunishmentQuest={activePunishmentQuest}
+          />
+        )}
+
+        {groomPlayer && activeTab === "SHOP" && (
+          <main className="groom-arena-view"><ArenaPanel roomId={joinedRoom.id} playerId={groomPlayer.id} mode="SHOP" /></main>
+        )}
+        {groomPlayer && activeTab === "INVENTORY" && (
+          <main className="groom-arena-view"><ArenaPanel roomId={joinedRoom.id} playerId={groomPlayer.id} mode="INVENTORY" /></main>
+        )}
+        {groomPlayer && activeTab === "PVP" && (
+          <main className="groom-arena-view"><ArenaPanel roomId={joinedRoom.id} playerId={groomPlayer.id} mode="PVP" /></main>
+        )}
+        {groomPlayer && activeTab === "PVE" && (
+          <main className="groom-arena-view"><ArenaPanel roomId={joinedRoom.id} playerId={groomPlayer.id} mode="PVE" /></main>
+        )}
+        {groomPlayer && activeTab === "SLOT" && (
+          <main className="groom-arena-view"><SlotMachine roomId={joinedRoom.id} player={groomPlayer} /></main>
+        )}
+        {!groomPlayer && activeTab !== "NORMAL" && (
+          <main className="groom-arena-view"><section className="arena-panel">Vőlegény játékosrekord betöltése…</section></main>
+        )}
+
+        <ScrollToTopButton />
+      </div>
+    );
   }
 
   return (
@@ -1846,6 +2009,7 @@ function App() {
 				placeholder="Játékos neve"
 				maxLength={30}
 			  />
+
 
 			  <button
 				className="player-login__button"
@@ -2008,14 +2172,18 @@ function App() {
 
             <nav className="hamburger-menu-list">
               {([
-                ["NORMAL", "🎯", "Normál feladatok"],
+                ["NORMAL", "🎯", "Feladatok"],
                 ["ENVELOPE", "📩", "Boríték"],
                 ["PUNISHMENT", "😈", "Büntetés"],
                 ["JOKERS", "🃏", "Jokerek"],
-                ["ROUNDS", "🍻", "Körök"],
+                ["ROUNDS", "🍻", "Ital körök"],
                 ["SLOT", "🎰", "Kaszinó"],
-                ["DRAW", "🎲", "Sorsolás"],
-                ["COMPLETED", "📜", "Teljesítve"],
+                ["DRAW", "🎲", "Survivor draw"],
+                ["SHOP", "🛒", "Shop"],
+                ["INVENTORY", "🎒", "Inventory"],
+                ["PVP", "⚔️", "PvP Aréna"],
+                ["PVE", "👹", "PvE Aréna"],
+                ["COMPLETED", "📜", "Teljesített"],
                 ["ADD", "➕", "Új feladat"]
               ] as const).map(([tab, icon, label]) => (
                 <button
@@ -2047,6 +2215,14 @@ function App() {
           </aside>
         </div>
       )}
+
+        {activePlayer && <ChallengePopup roomId={joinedRoom.id} playerId={activePlayer.id} onOpenArena={() => { setActiveTab("PVP"); setMenuOpen(false); }} />}
+
+        {activePlayer && activeTab === "SHOP" && <ArenaPanel roomId={joinedRoom.id} playerId={activePlayer.id} mode="SHOP" />}
+        {activePlayer && activeTab === "INVENTORY" && <ArenaPanel roomId={joinedRoom.id} playerId={activePlayer.id} mode="INVENTORY" />}
+        {activePlayer && activeTab === "PVP" && <ArenaPanel roomId={joinedRoom.id} playerId={activePlayer.id} mode="PVP" />}
+        {activePlayer && activeTab === "PVE" && <ArenaPanel roomId={joinedRoom.id} playerId={activePlayer.id} mode="PVE" />}
+        {["SHOP","INVENTORY","PVP","PVE"].includes(activeTab) && !activePlayer && <section style={panelStyle}><p>Az aréna és a shop használatához előbb lépj be játékosként.</p></section>}
 
 		{activeTab === "NORMAL" && (
 		  <section style={{ marginTop: 24 }}>

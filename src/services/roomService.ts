@@ -30,6 +30,7 @@ export interface Room {
 
   currentXp: number;
   targetXp: number;
+  startingPoints: number;
 
   status:
     | "WAITING"
@@ -143,6 +144,8 @@ function mapRoom(
       data.targetXp ?? 500
     ),
 
+    startingPoints: Math.max(0, Math.floor(Number(data.startingPoints ?? 500))),
+
     status:
       (data.status ??
         "ACTIVE") as Room["status"],
@@ -202,7 +205,8 @@ function mapRoom(
 export async function createRoom(
   name = "Legénybúcsú RPG",
   groomName = "Vőlegény",
-  targetXp = 500
+  targetXp = 500,
+  startingPoints = 500
 ): Promise<Room> {
   const roomCode =
     await generateUniqueRoomCode();
@@ -214,6 +218,7 @@ export async function createRoom(
 
     currentXp: 0,
     targetXp: Math.min(5000, Math.max(100, Math.round(targetXp))),
+    startingPoints: Math.max(0, Math.floor(Number(startingPoints) || 0)),
 
     status: "ACTIVE" as const,
     victoryReached: false,

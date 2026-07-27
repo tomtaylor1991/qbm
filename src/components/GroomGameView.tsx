@@ -28,7 +28,6 @@ interface GroomGameViewProps {
   activeNormalQuest: Quest | null;
   activeEnvelopeQuest: Quest | null;
   activePunishmentQuest: Quest | null;
-  onLeave: () => void;
 }
 
 interface CompletionAnimationState {
@@ -200,8 +199,7 @@ export default function GroomGameView({
   players,
   activeNormalQuest,
   activeEnvelopeQuest,
-  activePunishmentQuest,
-  onLeave
+  activePunishmentQuest
 }: GroomGameViewProps) {
   const initializedRef =
     useRef(false);
@@ -399,12 +397,6 @@ export default function GroomGameView({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onLeave}
-        >
-          Kilépés
-        </button>
       </header>
 
       <div

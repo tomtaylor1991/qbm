@@ -1794,3 +1794,65 @@ label {
     grid-column: 1 / -1;
   }
 }
+
+/* Minimal groom-only navigation: quest/certificate + requested RPG tools. */
+.groom-shell { width: 100%; }
+.groom-tools-nav {
+  position: sticky;
+  top: 0;
+  z-index: 120;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(10, 14, 25, 0.96);
+  border-bottom: 3px solid #33425f;
+}
+.groom-tools-nav button { margin: 0; }
+.groom-tools-nav button.is-active { outline: 3px solid #8eabdf; outline-offset: 1px; }
+.groom-arena-view {
+  width: min(960px, calc(100% - 24px));
+  margin: 0 auto;
+  padding: 24px 0 80px;
+}
+
+/* Groom view: only the same fixed hamburger control remains visible while scrolling. */
+.groom-menu-header {
+  position: static;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.groom-menu-header .hamburger-button {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+}
+
+/* 2026-07 mobile density pass */
+@media (max-width: 680px) {
+  body { font-size: 14px; }
+  .app, .groom-shell { font-size: .92rem; }
+  .hamburger-button { width: 42px; height: 42px; padding: 6px; }
+  .groom-arena-view { width: calc(100% - 12px); padding: 8px 0 48px; }
+  .hamburger-drawer { width: min(330px, 90vw); padding: 12px; }
+  .hamburger-menu-list { gap: 5px; }
+  .hamburger-menu-list button { min-height: 43px; padding: 7px 9px; font-size: .85rem; }
+  .hamburger-room-summary { margin: 10px 0; padding: 8px; }
+}
+
+/* 2026-07 mobile comfort pass: ~20% larger than the compact pass, width-safe. */
+@media (max-width: 680px) {
+  body { font-size: 16px; }
+  .app, .groom-shell { font-size: 1rem; }
+  .groom-arena-view { width: calc(100% - 10px); padding: 10px 0 52px; }
+  .hamburger-button { width: 46px; height: 46px; padding: 7px; }
+  .hamburger-drawer { width: min(350px, 92vw); padding: 14px; }
+  .hamburger-menu-list { gap: 6px; }
+  .hamburger-menu-list button { min-height: 47px; padding: 8px 10px; font-size: .94rem; }
+  .hamburger-room-summary { margin: 12px 0; padding: 10px; }
+  button, input, select, textarea { max-width: 100%; }
+}

@@ -3,6 +3,8 @@ import { jsPDF } from "jspdf";
 
 import type { Room } from "./roomService";
 import type { Quest } from "../types/game";
+import { getShopItem } from "../data/shopCatalog";
+import type { InventoryEntry, ShopItem } from "../types/arena";
 
 export interface CertificatePlayer {
   id: string;
@@ -11,12 +13,74 @@ export interface CertificatePlayer {
   huntPoints: number;
   catches: number;
   joinedAt: string;
+  inventory?: InventoryEntry[];
+  pvpWins?: number;
+  pvpLosses?: number;
+  pvpPointsWon?: number;
+  pveWins?: number;
+  pveLosses?: number;
+  slotSpins?: number;
+  slotPointsSpent?: number;
+  slotPointsWon?: number;
+  slotJackpots?: number;
+  isGroom?: boolean;
 }
 
 interface ExportCertificateOptions {
   room: Room;
   quests: Quest[];
   players: CertificatePlayer[];
+}
+
+
+const rarityRank: Record<ShopItem["rarity"], number> = {
+  COMMON: 1,
+  UNCOMMON: 2,
+  RARE: 3,
+  EPIC: 4,
+  LEGENDARY: 5
+};
+
+function getInventoryItems(player: CertificatePlayer | undefined): Array<{ item: ShopItem; quantity: number }> {
+  if (!player?.inventory) return [];
+  return player.inventory
+    .map((entry) => ({ item: getShopItem(entry.itemId), quantity: Math.max(0, Number(entry.quantity ?? 0)) }))
+    .filter((entry): entry is { item: ShopItem; quantity: number } => Boolean(entry.item) && entry.quantity > 0);
+}
+
+function strongestItem(items: Array<{ item: ShopItem; quantity: number }>, type: ShopItem["type"]): ShopItem | null {
+  const score = (item: ShopItem) => {
+    const power = item.type === "HEAL" ? Number(item.maxHeal ?? 0) : Number(item.maxDamage ?? 0);
+    return power * 100 + Number(item.defense ?? 0) * 10 + rarityRank[item.rarity];
+  };
+  return items.filter(({ item }) => item.type === type).map(({ item }) => item).sort((a, b) => score(b) - score(a))[0] ?? null;
+}
+
+function buildTitles(player: CertificatePlayer | undefined, pvpRank: number | null, inventory: Array<{ item: ShopItem; quantity: number }>): string[] {
+  if (!player) return ["📜 A Házasság Bajnoka"];
+  const titles: string[] = [];
+  const wins = Number(player.pvpWins ?? 0);
+  const losses = Number(player.pvpLosses ?? 0);
+  const pveWins = Number(player.pveWins ?? 0);
+  const pveLosses = Number(player.pveLosses ?? 0);
+  const inventoryCount = inventory.reduce((sum, entry) => sum + entry.quantity, 0);
+  if (pvpRank === 1 && wins > 0) titles.push("👑 Arénakirály");
+  if (wins >= 5) titles.push("🥊 Kocsmai Gladiátor");
+  if (pveWins >= 5) titles.push("👹 Szörnyirtó");
+  if (Number(player.huntPoints ?? 0) >= 500) titles.push("💰 Pontmágnás");
+  if (inventoryCount >= 15) titles.push("🎒 Hörcsögölő");
+  if (inventory.some(({ item }) => item.rarity === "LEGENDARY")) titles.push("✨ Relikviavadász");
+  if (inventory.some(({ item }) => item.type === "BATTLE_PET")) titles.push("🐾 Vadállat-suttogó");
+  if (losses >= wins + 4 || pveLosses >= pveWins + 4) titles.push("💀 Emberi Boxzsák");
+  if (Number(player.slotJackpots ?? 0) > 0) titles.push("🎰 Jackpot Próféta");
+  if (!titles.length) titles.push("⚔️ Túlélő Kalandor");
+  return titles.slice(0, 6);
+}
+
+function itemPowerLabel(item: ShopItem): string {
+  if (item.type === "HEAL") return `❤️ ${item.minHeal ?? 0}–${item.maxHeal ?? 0} heal`;
+  if (item.type === "BATTLE_PET") return `🐾 ${item.minDamage ?? 0}–${item.maxDamage ?? 0} sebzés · ${item.actionLives ?? 0} élet`;
+  return `⚔️ ${item.minDamage ?? 0}–${item.maxDamage ?? 0} sebzés`;
 }
 
 function escapeHtml(value: string): string {
@@ -165,6 +229,38 @@ function createCertificateHtml({
     (player) => player.huntPoints > 0
   );
 
+  const groomPlayer = players.find((player) => player.isGroom) ?? players.find((player) => player.name.trim().toLocaleLowerCase("hu-HU") === room.groomName.trim().toLocaleLowerCase("hu-HU"));
+  const groomInventory = getInventoryItems(groomPlayer);
+  const inventoryCount = groomInventory.reduce((sum, entry) => sum + entry.quantity, 0);
+  const rarityCounts = groomInventory.reduce<Record<ShopItem["rarity"], number>>((acc, entry) => {
+    acc[entry.item.rarity] += entry.quantity;
+    return acc;
+  }, { COMMON: 0, UNCOMMON: 0, RARE: 0, EPIC: 0, LEGENDARY: 0 });
+  const strongestWeapon = strongestItem(groomInventory, "WEAPON");
+  const strongestPet = strongestItem(groomInventory, "BATTLE_PET");
+  const showcaseItems = groomInventory
+    .slice()
+    .sort((a, b) => rarityRank[b.item.rarity] - rarityRank[a.item.rarity] || b.item.price - a.item.price)
+    .slice(0, 6);
+  const pvpRanking = players.slice().sort((a, b) => Number(b.pvpWins ?? 0) - Number(a.pvpWins ?? 0) || Number(b.pvpPointsWon ?? 0) - Number(a.pvpPointsWon ?? 0));
+  const groomPvpRank = groomPlayer ? Math.max(1, pvpRanking.findIndex((player) => player.id === groomPlayer.id) + 1) : null;
+  const groomPvpWins = Number(groomPlayer?.pvpWins ?? 0);
+  const groomPvpLosses = Number(groomPlayer?.pvpLosses ?? 0);
+  const groomPveWins = Number(groomPlayer?.pveWins ?? 0);
+  const groomPveLosses = Number(groomPlayer?.pveLosses ?? 0);
+  const groomPvpTotal = groomPvpWins + groomPvpLosses;
+  const groomPvpRate = groomPvpTotal > 0 ? Math.round(groomPvpWins / groomPvpTotal * 100) : 0;
+  const groomTitles = buildTitles(groomPlayer, groomPvpRank, groomInventory);
+  const slotSpent = Number(groomPlayer?.slotPointsSpent ?? 0);
+  const slotWon = Number(groomPlayer?.slotPointsWon ?? 0);
+  const slotNet = slotWon - slotSpent;
+
+  const showcaseHtml = showcaseItems.length ? showcaseItems.map(({ item, quantity }) => `
+    <article class="loot-card">
+      <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" />
+      <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.rarity)} · ${escapeHtml(itemPowerLabel(item))}${quantity > 1 ? ` · ×${quantity}` : ""}</span></div>
+    </article>`).join("") : `<p class="empty-message">A kaland végére az inventory hősiesen kiürült.</p>`;
+
   const questRows = completedQuests.length
     ? completedQuests
         .map((quest, index) => {
@@ -264,6 +360,48 @@ function createCertificateHtml({
         </div>
       </section>
 
+      <section class="certificate-page-section hero-summary-section">
+        <h2>🏆 A BAJNOK VÉGSŐ KARAKTERLAPJA</h2>
+        <p class="story-lead">A küldetések véget értek, de a Shop, a Kaszinó és az Arénák után is maradt mit feljegyezni a krónikásoknak.</p>
+
+        <div class="stats-grid arena-stats-grid">
+          <div><span>Személyes pont</span><strong>${Number(groomPlayer?.huntPoints ?? 0)}</strong></div>
+          <div><span>PvP mérleg</span><strong>${groomPvpWins}–${groomPvpLosses}</strong></div>
+          <div><span>PvP győzelmi arány</span><strong>${groomPvpRate}%</strong></div>
+          <div><span>PvP rang</span><strong>${groomPvpRank ? `#${groomPvpRank}` : "—"}</strong></div>
+          <div><span>PvP-ben nyert pont</span><strong>${Number(groomPlayer?.pvpPointsWon ?? 0)}</strong></div>
+          <div><span>PvE mérleg</span><strong>${groomPveWins}–${groomPveLosses}</strong></div>
+          <div><span>Megmaradt tárgy</span><strong>${inventoryCount}</strong></div>
+          <div><span>Jackpot</span><strong>${Number(groomPlayer?.slotJackpots ?? 0)}</strong></div>
+        </div>
+
+        <div class="achievement-box">
+          <h3>🎖️ CÍMEK ÉS KITÜNTETÉSEK</h3>
+          <div class="title-chips">${groomTitles.map((title) => `<span>${escapeHtml(title)}</span>`).join("")}</div>
+        </div>
+
+        <div class="equipment-grid">
+          <div class="equipment-box"><span>⚔️ LEGERŐSEBB FEGYVER</span><strong>${strongestWeapon ? escapeHtml(strongestWeapon.name) : "Ököl, a klasszikus"}</strong><small>${strongestWeapon ? escapeHtml(itemPowerLabel(strongestWeapon)) : "3–8 sebzés, örök garancia"}</small></div>
+          <div class="equipment-box"><span>🐾 LEGERŐSEBB HARCI ÁLLAT</span><strong>${strongestPet ? escapeHtml(strongestPet.name) : "Nem maradt szolgálatban"}</strong><small>${strongestPet ? escapeHtml(itemPowerLabel(strongestPet)) : "A fauna fellélegzett."}</small></div>
+        </div>
+
+        <div class="rarity-line">
+          <span>COMMON <strong>${rarityCounts.COMMON}</strong></span>
+          <span>UNCOMMON <strong>${rarityCounts.UNCOMMON}</strong></span>
+          <span>RARE <strong>${rarityCounts.RARE}</strong></span>
+          <span>EPIC <strong>${rarityCounts.EPIC}</strong></span>
+          <span>LEGENDARY <strong>${rarityCounts.LEGENDARY}</strong></span>
+        </div>
+
+        <h3>🎒 A KALAND VÉGÉN NÁLA MARADT</h3>
+        <div class="loot-grid">${showcaseHtml}</div>
+
+        <div class="casino-summary">
+          <h3>🎰 KASZINÓI ZÁRÓJELENTÉS</h3>
+          <p>${Number(groomPlayer?.slotSpins ?? 0)} pörgetés · ${slotSpent} pont feltéve · ${slotWon} pont kifizetés · nettó <strong>${slotNet >= 0 ? "+" : ""}${slotNet}</strong> pont.</p>
+        </div>
+      </section>
+
       <section class="certificate-page-section">
         <h2>🗡️ A TELJESÍTETT PRÓBÁK</h2>
         ${questRows}
@@ -295,8 +433,9 @@ function createCertificateHtml({
             a teljesített küldetések és az este nevetése örökre fennmaradnak e kalandlevél lapjain.
           </p>
           <p class="final-proclamation">
-            Ezennel tanúsítjuk, hogy ${escapeHtml(room.groomName)} méltón viselte
-            a HÁZASSÁG BAJNOKA címet.
+            ${escapeHtml(room.groomName)} túlélte a Quest Before Marriage hadjáratot:<br />
+            <strong>${room.currentXp} XP · ${groomPvpWins} PvP győzelem · ${groomPveWins} PvE győzelem · ${inventoryCount} túlélő tárgy.</strong><br />
+            Ezennel hivatalosan házasodásra bocsátható.
           </p>
         </div>
 
@@ -543,6 +682,24 @@ function createCertificateStyles(): string {
       text-align: center;
       font-size: 20px;
     }
+
+
+    .hero-summary-section h3 { margin: 24px 0 12px; }
+    .arena-stats-grid { grid-template-columns: repeat(4, 1fr); }
+    .achievement-box, .casino-summary { margin-top: 20px; padding: 18px; border: 3px solid #1a2338; background: rgba(255,255,255,.26); }
+    .title-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .title-chips span { padding: 7px 10px; border: 2px solid #1a2338; background: #efe3bf; font-weight: 700; }
+    .equipment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+    .equipment-box { padding: 16px; border: 3px double #1a2338; background: rgba(255,255,255,.22); }
+    .equipment-box span, .equipment-box small { display: block; }
+    .equipment-box strong { display: block; margin: 8px 0; font-size: 20px; }
+    .rarity-line { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 22px; }
+    .rarity-line span { padding: 6px 9px; border: 1px solid #1a2338; font-size: 12px; }
+    .loot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .loot-card { min-height: 76px; display: flex; align-items: center; gap: 12px; padding: 10px; border: 2px solid #1a2338; background: rgba(255,255,255,.22); }
+    .loot-card img { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
+    .loot-card strong, .loot-card span { display: block; }
+    .loot-card span { margin-top: 4px; font-size: 11px; }
 
     .certificate-footer {
       display: flex;

@@ -2,11 +2,13 @@ import {
   addDoc,
   collection,
   doc,
+  getDocs,
   increment,
   onSnapshot,
   orderBy,
   query,
   runTransaction,
+  where,
   updateDoc,
   type Unsubscribe
 } from "firebase/firestore";
@@ -26,6 +28,14 @@ export interface Player {
   slotPointsWon: number;
   slotJackpots: number;
   joinedAt: string;
+  inventory: { itemId: string; quantity: number }[];
+  present: boolean;
+  pvpWins: number;
+  pvpLosses: number;
+  pvpPointsWon: number;
+  pveWins: number;
+  pveLosses: number;
+  isGroom: boolean;
 }
 
 export type RoundType = "BEER" | "SPIRIT";
@@ -39,14 +49,16 @@ export interface SlotSpinResult {
 
 const SLOT_COST = 10;
 
-export async function addPlayer(roomId: string, name: string): Promise<string> {
+export async function addPlayer(roomId: string, name: string, startingPoints = 500): Promise<string> {
   const normalizedName = name.trim();
   if (!normalizedName) throw new Error("A játékos neve kötelező.");
+
+  const safeStartingPoints = Math.max(0, Math.floor(Number(startingPoints) || 0));
 
   const playerReference = await addDoc(collection(db, "rooms", roomId, "players"), {
     name: normalizedName,
     xp: 0,
-    huntPoints: 0,
+    huntPoints: safeStartingPoints,
     catches: 0,
     beerRounds: 0,
     spiritRounds: 0,
@@ -54,10 +66,46 @@ export async function addPlayer(roomId: string, name: string): Promise<string> {
     slotPointsSpent: 0,
     slotPointsWon: 0,
     slotJackpots: 0,
+    inventory: [],
+    present: true,
+    pvpWins: 0,
+    pvpLosses: 0,
+    pvpPointsWon: 0,
+    pveWins: 0,
+    pveLosses: 0,
     joinedAt: new Date().toISOString()
   });
 
   return playerReference.id;
+}
+
+
+export async function ensureGroomPlayer(roomId: string, groomName: string): Promise<string> {
+  const normalizedName = groomName.trim();
+  if (!normalizedName) throw new Error("A vőlegény neve kötelező.");
+
+  const matches = await getDocs(query(
+    collection(db, "rooms", roomId, "players"),
+    where("name", "==", normalizedName)
+  ));
+
+  if (matches.empty) {
+    const playerId = await addPlayer(roomId, normalizedName, 0);
+    await updateDoc(doc(db, "rooms", roomId, "players", playerId), { isGroom: true, archivedDuplicate: false, present: true });
+    return playerId;
+  }
+
+  const ordered = [...matches.docs].sort((a, b) =>
+    String(a.data().joinedAt ?? "").localeCompare(String(b.data().joinedAt ?? ""))
+  );
+  const canonical = ordered[0];
+  await updateDoc(canonical.ref, { isGroom: true, archivedDuplicate: false, present: true });
+
+  await Promise.all(ordered.slice(1).map((duplicate) =>
+    updateDoc(duplicate.ref, { archivedDuplicate: true, present: false, isGroom: false })
+  ));
+
+  return canonical.id;
 }
 
 export function subscribePlayers(roomId: string, callback: (players: Player[]) => void): Unsubscribe {
@@ -67,7 +115,7 @@ export function subscribePlayers(roomId: string, callback: (players: Player[]) =
   );
 
   return onSnapshot(playersQuery, (snapshot) => {
-    callback(snapshot.docs.map((playerDocument) => {
+    callback(snapshot.docs.filter((playerDocument) => playerDocument.data().archivedDuplicate !== true).map((playerDocument) => {
       const data = playerDocument.data();
       return {
         id: playerDocument.id,
@@ -81,10 +129,23 @@ export function subscribePlayers(roomId: string, callback: (players: Player[]) =
         slotPointsSpent: Number(data.slotPointsSpent ?? 0),
         slotPointsWon: Number(data.slotPointsWon ?? 0),
         slotJackpots: Number(data.slotJackpots ?? 0),
+        inventory: Array.isArray(data.inventory) ? data.inventory.map((entry: any) => ({ itemId: String(entry?.itemId ?? ""), quantity: Math.max(0, Number(entry?.quantity ?? 0)) })).filter((entry: { itemId: string; quantity: number }) => entry.itemId && entry.quantity > 0) : [],
+        present: data.present !== false,
+        pvpWins: Number(data.pvpWins ?? 0),
+        pvpLosses: Number(data.pvpLosses ?? 0),
+        pvpPointsWon: Number(data.pvpPointsWon ?? 0),
+        pveWins: Number(data.pveWins ?? 0),
+        pveLosses: Number(data.pveLosses ?? 0),
+        isGroom: data.isGroom === true,
         joinedAt: String(data.joinedAt ?? "")
       } satisfies Player;
     }));
   });
+}
+
+
+export async function setPlayerPresence(roomId: string, playerId: string, present: boolean): Promise<void> {
+  await updateDoc(doc(db, "rooms", roomId, "players", playerId), { present });
 }
 
 export async function addHuntPoints(roomId: string, playerId: string, points = 10): Promise<void> {

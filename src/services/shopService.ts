@@ -1,0 +1,12 @@
+import { doc, runTransaction } from "firebase/firestore";
+import { db } from "../firebase/firebase";
+import { getShopItem, shopCatalog } from "../data/shopCatalog";
+import type { InventoryEntry, ItemRarity, ShopItem } from "../types/arena";
+
+function normalizeInventory(raw: unknown): InventoryEntry[] { return Array.isArray(raw) ? raw.map((x:any)=>({itemId:String(x?.itemId??""),quantity:Math.max(0,Number(x?.quantity??0))})).filter(x=>x.itemId&&x.quantity>0) : []; }
+function addItem(inv:InventoryEntry[], itemId:string, amount=1){ const next=inv.map(x=>({...x})); const found=next.find(x=>x.itemId===itemId); if(found) found.quantity+=amount; else next.push({itemId,quantity:amount}); return next; }
+export async function buyItem(roomId:string,playerId:string,itemId:string,discount=0){ const item=getShopItem(itemId); if(!item) throw new Error("Ismeretlen tárgy."); const price=Math.max(1,Math.floor(item.price*(1-discount))); const ref=doc(db,"rooms",roomId,"players",playerId); return runTransaction(db,async tx=>{ const snap=await tx.get(ref); if(!snap.exists()) throw new Error("Játékos nem található."); const data=snap.data(); const points=Number(data.huntPoints??0); if(points<price) throw new Error("Nincs elég személyes pontod."); tx.update(ref,{huntPoints:points-price,inventory:addItem(normalizeInventory(data.inventory),item.id)}); return price; }); }
+export async function buyRandomFromCategory(roomId:string,playerId:string,category:string){ const pool=shopCatalog.filter(i=>i.category===category); if(!pool.length) throw new Error("Üres kategória."); const item=pool[Math.floor(Math.random()*pool.length)]; const paid=await buyItem(roomId,playerId,item.id,0.12); return {item,paid}; }
+const weights:[ItemRarity,number][]=[["COMMON",45],["UNCOMMON",28],["RARE",15],["EPIC",8],["LEGENDARY",4]];
+export function randomGiftItem(minRarity?:ItemRarity):ShopItem { const minIndex=minRarity?["COMMON","UNCOMMON","RARE","EPIC","LEGENDARY"].indexOf(minRarity):0; const allowed=weights.filter(([r])=>["COMMON","UNCOMMON","RARE","EPIC","LEGENDARY"].indexOf(r)>=minIndex); const total=allowed.reduce((s,[,w])=>s+w,0); let roll=Math.random()*total; let rarity=allowed[0][0]; for(const [r,w] of allowed){roll-=w;if(roll<=0){rarity=r;break;}} const pool=shopCatalog.filter(i=>i.rarity===rarity); return pool[Math.floor(Math.random()*pool.length)]; }
+export { normalizeInventory, addItem };

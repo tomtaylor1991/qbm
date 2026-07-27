@@ -15,14 +15,16 @@ export default function SurvivorDraw({ roomId, players }: Props) {
   const [running, setRunning] = useState(false);
   const [rewardMessage, setRewardMessage] = useState("");
 
+  const eligiblePlayers = players.filter((player) => !player.isGroom);
+
   function startDraw() {
-    if (players.length < 2) {
+    if (eligiblePlayers.length < 2) {
       alert("A sorsoláshoz legalább két kísérő szükséges.");
       return;
     }
 
-    const selected = players[Math.floor(Math.random() * players.length)];
-    const losers = players.filter((player) => player.id !== selected.id);
+    const selected = eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)];
+    const losers = eligiblePlayers.filter((player) => player.id !== selected.id);
     const shuffled = [...losers].sort(() => Math.random() - 0.5);
 
     setEliminated([]);
@@ -65,7 +67,7 @@ export default function SurvivorDraw({ roomId, players }: Props) {
 
       <div className="cliff-stage">
         <div className="cliff-people">
-          {players.map((player) => {
+          {eligiblePlayers.map((player) => {
             const isOut = eliminated.includes(player.id);
             const isWinner = winner?.id === player.id;
             return (
@@ -79,7 +81,7 @@ export default function SurvivorDraw({ roomId, players }: Props) {
         <div className="cliff-gap" aria-hidden="true"><span>▼ SZAKADÉK ▼</span></div>
       </div>
 
-      <button type="button" onClick={startDraw} disabled={running || players.length < 2}>
+      <button type="button" onClick={startDraw} disabled={running || eligiblePlayers.length < 2}>
         {running ? "A SORS DÖNT..." : "⚔ SORSOLÁS INDÍTÁSA"}
       </button>
 

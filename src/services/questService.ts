@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -506,6 +507,15 @@ async function finishQuestInTransaction(
     questId
   );
 
+  const roomBefore = await getDoc(roomReference);
+  const groomName = roomBefore.exists() ? String(roomBefore.data().groomName ?? "").trim() : "";
+  const groomSnapshot = groomName
+    ? await getDocs(query(collection(db, "rooms", roomId, "players"), where("name", "==", groomName)))
+    : null;
+  const groomReference = groomSnapshot?.docs[0]
+    ? doc(db, "rooms", roomId, "players", groomSnapshot.docs[0].id)
+    : null;
+
   return runTransaction(
     db,
     async (transaction) => {
@@ -518,6 +528,10 @@ async function finishQuestInTransaction(
         await transaction.get(
           questReference
         );
+
+      const groomPlayerSnapshot = groomReference
+        ? await transaction.get(groomReference)
+        : null;
 
       if (!roomSnapshot.exists()) {
         throw new Error(
@@ -611,6 +625,14 @@ async function finishQuestInTransaction(
         )
       );
 
+      if (groomReference && groomPlayerSnapshot?.exists() && awardedPoints > 0) {
+        const groomData = groomPlayerSnapshot.data();
+        transaction.update(groomReference, {
+          xp: Number(groomData.xp ?? 0) + awardedPoints,
+          huntPoints: Number(groomData.huntPoints ?? 0) + awardedPoints * 2
+        });
+      }
+
       return true;
     }
   );
@@ -621,11 +643,7 @@ export async function completeQuest(
   questId: string,
   playerName: string
 ): Promise<boolean> {
-  return finishQuestInTransaction(
-    roomId,
-    questId,
-    playerName
-  );
+  return finishQuestInTransaction(roomId, questId, playerName);
 }
 
 export async function incrementQuestCounter(
