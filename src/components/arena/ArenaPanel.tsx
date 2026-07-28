@@ -164,10 +164,11 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
   const ids = Object.keys(battle.skins);
   const [phase, setPhase] = useState<"PREVIEW"|"FIGHT"|"DONE">("PREVIEW");
   const [index, setIndex] = useState(0);
+  const [showActionCard, setShowActionCard] = useState(false);
   const battleRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setPhase("PREVIEW"); setIndex(0);
+    setPhase("PREVIEW"); setIndex(0); setShowActionCard(false);
     const previewTimer = window.setTimeout(() => setPhase("FIGHT"), 3600);
     return () => window.clearTimeout(previewTimer);
   }, [battle]);
@@ -176,15 +177,25 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
     if (phase !== "FIGHT") return;
     window.requestAnimationFrame(() => battleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     if (!battle.log.length) { setPhase("DONE"); return; }
-    const stepMs = 1020;
-    const timer = window.setInterval(() => {
+    // A tényleges csata legalább ~30 másodpercig tartson, hogy minden akció olvasható legyen.
+    const stepMs = Math.max(2300, Math.ceil(30000 / Math.max(1, battle.log.length)));
+    let actionCardTimer: number | null = null;
+    let timer: number | null = null;
+    const revealNext = () => {
       setIndex((current) => {
         const next = Math.min(current + 1, battle.log.length);
-        if (next >= battle.log.length) { window.clearInterval(timer); window.setTimeout(() => setPhase("DONE"), 120); }
+        setShowActionCard(true);
+        if (actionCardTimer) window.clearTimeout(actionCardTimer);
+        actionCardTimer = window.setTimeout(() => setShowActionCard(false), Math.max(1800, Math.floor(stepMs * 0.78)));
+        if (next >= battle.log.length) {
+          if (timer) window.clearInterval(timer);
+          window.setTimeout(() => setPhase("DONE"), Math.max(700, Math.floor(stepMs * 0.32)));
+        }
         return next;
       });
-    }, stepMs);
-    return () => window.clearInterval(timer);
+    };
+    timer = window.setInterval(revealNext, stepMs);
+    return () => { if (timer) window.clearInterval(timer); if (actionCardTimer) window.clearTimeout(actionCardTimer); };
   }, [phase, battle]);
 
   if (phase === "PREVIEW") return <LoadoutPreview battle={battle} names={names} ids={ids} />;
@@ -230,6 +241,10 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
           {item ? <img src={item.image} alt={item.name} /> : <span>👊</span>}
         </div>}
         {last && <div key={`f-${last.turn}`} className={`floating-number ${last.heal ? "floating-heal" : "floating-damage"} float-${last.defenderId === ids[0] ? "left" : "right"}`}>{last.heal ? `+${last.heal}` : `−${last.damage ?? 0}`}{last.crit ? " CRIT!" : ""}</div>}
+        {last && showActionCard && <div key={`action-card-${last.turn}`} className={`battle-action-card ${last.heal ? "is-heal" : "is-damage"}`}>
+          <div className="battle-action-card__art">{item ? <img src={item.image} alt={item.name} /> : <span>👊</span>}</div>
+          <div className="battle-action-card__copy"><small>{names[last.actorId] ?? last.actorId}</small><strong>{item?.name ?? (last.actionType === "PET" ? "Harci állat" : "Ököl")}</strong><b>{last.heal ? `+${last.heal} HP` : `−${last.damage ?? 0} HP`}</b>{last.blocked ? <em>🛡 {last.blocked} blokkolva</em> : null}{last.crit ? <em>⚡ CRIT</em> : null}</div>
+        </div>}
         <div className="battle-status">⚔ AKCIÓ {Math.max(1,index)}/{battle.log.length}</div>
         <div className="battle-log-rich">{visible.slice(-3).map((action, idx, arr) => <BattleEvent key={action.turn} action={action} names={names} active={idx===arr.length-1}/>)}</div>
       </div>
@@ -312,7 +327,7 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
         try { const result = await buyRandomFromCategory(roomId, me.id, category); setMessage(`🎲 ${result.item.name} — ${result.paid} pont`); setPurchaseFx({item:result.item,paid:result.paid}); }
         catch (error) { setMessage(error instanceof Error ? error.message : "Hiba"); }
       }}>🎲 Random kérek</button></div>
-      <div className="shop-grid">{shopCatalog.filter((item) => item.category === category).map((item) => <article key={item.id} className={`item-card rarity-${item.rarity.toLowerCase()}`}>
+      <div className="shop-grid">{shopCatalog.filter((item) => item.category === category).sort((a,b) => a.price - b.price || a.name.localeCompare(b.name, "hu")).map((item) => <article key={item.id} className={`item-card rarity-${item.rarity.toLowerCase()}`}>
         <img className="item-art" src={item.image} alt={item.name} loading="lazy" />
         <div className="item-card-body"><strong>{item.name}</strong><small>{item.type} · {item.rarity}</small><span className="item-stats">{statLabel(item)}</span><span className="item-price">{item.price} pont · nálad: {owned(item)}</span></div>
         <button className="buy-button" onClick={() => void buy(item)}>Megveszem</button>

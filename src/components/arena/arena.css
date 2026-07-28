@@ -642,3 +642,17 @@
   .battle-stage .event-number { font-size: .71rem; }
   .battle-stage .battle-event-active .event-number { font-size: .86rem; }
 }
+
+/* Readable battle pacing + transient action spotlight. */
+.battle-log-rich{width:100%;gap:8px}
+.battle-event{font-size:1rem}
+.battle-event-active{transform:scale(1.02);transform-origin:center}
+.battle-event-active .event-copy strong{font-size:1.06rem}
+.battle-event-active .event-number{font-size:1.55rem;font-weight:900}
+.battle-action-card{position:absolute;z-index:15;left:50%;top:50%;width:min(390px,88%);transform:translate(-50%,-50%);display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:center;padding:14px;border:3px solid #f0d38a;background:rgba(10,15,27,.96);box-shadow:0 0 0 3px rgba(8,11,19,.7),0 18px 36px rgba(0,0,0,.45);animation:actionCardIn 2s ease both;pointer-events:none}
+.battle-action-card__art{width:96px;height:82px;display:grid;place-items:center;background:#172137;border:2px solid #4c648d;overflow:hidden}
+.battle-action-card__art img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}.battle-action-card__art span{font-size:3.4rem}
+.battle-action-card__copy{display:flex;flex-direction:column;gap:3px;text-align:left}.battle-action-card__copy small{opacity:.72}.battle-action-card__copy strong{font-size:1.05rem}.battle-action-card__copy b{font-size:2rem;line-height:1}.battle-action-card__copy em{font-style:normal;font-weight:800;color:#f0d38a}
+.battle-action-card.is-heal .battle-action-card__copy b{color:#70ff9d}.battle-action-card.is-damage .battle-action-card__copy b{color:#ff7188}
+@keyframes actionCardIn{0%{opacity:0;transform:translate(-50%,-42%) scale(.86)}10%,78%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-56%) scale(.96)}}
+@media(max-width:680px){.battle-log-rich{gap:5px}.battle-event{font-size:.82rem}.battle-event-active .event-copy strong{font-size:.88rem}.battle-event-active .event-number{font-size:1.22rem}.battle-action-card{grid-template-columns:72px 1fr;width:min(330px,92%);gap:9px;padding:9px}.battle-action-card__art{width:72px;height:62px}.battle-action-card__copy strong{font-size:.82rem}.battle-action-card__copy b{font-size:1.45rem}.battle-action-card__copy small,.battle-action-card__copy em{font-size:.7rem}}

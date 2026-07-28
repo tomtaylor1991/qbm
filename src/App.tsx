@@ -111,7 +111,37 @@ type GameTab =
 
 const SESSION_ROOM_CODE = "qbm-room-code";
 const SESSION_PLAYER_NAME = "qbm-player-name";
+const SESSION_PLAYER_ID = "qbm-player-id";
 const SESSION_VIEW_MODE = "qbm-view-mode";
+const LOCAL_REMEMBERED_SESSION = "qbm-remembered-session";
+
+interface RememberedSession {
+  roomCode: string;
+  playerId: string;
+  playerName: string;
+  mode: AppViewMode;
+}
+
+function readRememberedSession(): RememberedSession | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_REMEMBERED_SESSION);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<RememberedSession>;
+    if (!parsed.roomCode || !parsed.playerId || !parsed.mode) return null;
+    return {
+      roomCode: String(parsed.roomCode),
+      playerId: String(parsed.playerId),
+      playerName: String(parsed.playerName ?? ""),
+      mode: parsed.mode === "GROOM" ? "GROOM" : "COMPANION"
+    };
+  } catch {
+    return null;
+  }
+}
+
+function rememberSession(session: RememberedSession): void {
+  localStorage.setItem(LOCAL_REMEMBERED_SESSION, JSON.stringify(session));
+}
 
 const GROOM_REWARD_POINTS = 10;
 const GROOM_MIN_WAIT_MS = 120 * 1000;
@@ -194,9 +224,9 @@ function getCompletionModeLabel(
 }
 
 function App() {
-  const [viewMode, setViewMode] = useState<AppViewMode>(
-    (sessionStorage.getItem(SESSION_VIEW_MODE) as AppViewMode | null) ?? "COMPANION"
-  );
+  const rememberedAtBoot = useMemo(() => readRememberedSession(), []);
+  const initialMode = (sessionStorage.getItem(SESSION_VIEW_MODE) as AppViewMode | null) ?? rememberedAtBoot?.mode ?? "COMPANION";
+  const [viewMode, setViewMode] = useState<AppViewMode>(initialMode);
 
   const [roomGroomName, setRoomGroomName] = useState("Vőlegény");
   const [roomTargetXp, setRoomTargetXp] = useState("500");
@@ -206,21 +236,25 @@ function App() {
     useState("");
 
   const [joinCode, setJoinCode] = useState(
-    sessionStorage.getItem(SESSION_ROOM_CODE) ?? ""
+    sessionStorage.getItem(SESSION_ROOM_CODE) ?? rememberedAtBoot?.roomCode ?? ""
   );
 
   const [joinedRoom, setJoinedRoom] =
     useState<Room | null>(null);
 
   const [playerName, setPlayerName] = useState(
-    sessionStorage.getItem(SESSION_PLAYER_NAME) ?? ""
+    sessionStorage.getItem(SESSION_PLAYER_NAME) ?? rememberedAtBoot?.playerName ?? ""
+  );
+
+  const [activePlayerId, setActivePlayerId] = useState(
+    sessionStorage.getItem(SESSION_PLAYER_ID) ?? rememberedAtBoot?.playerId ?? ""
   );
 
   const [activePlayerName, setActivePlayerName] =
     useState(
-      ((sessionStorage.getItem(SESSION_VIEW_MODE) as AppViewMode | null) ?? "COMPANION") === "GROOM"
+      initialMode === "GROOM"
         ? ""
-        : sessionStorage.getItem(SESSION_PLAYER_NAME) ?? ""
+        : sessionStorage.getItem(SESSION_PLAYER_NAME) ?? rememberedAtBoot?.playerName ?? ""
     );
 
   const [players, setPlayers] =
@@ -449,12 +483,13 @@ function App() {
 
   const activePlayer = useMemo(
     () =>
+      players.find((player) => player.id === activePlayerId) ??
       players.find(
         (player) =>
           player.name.toLocaleLowerCase("hu-HU") ===
           activePlayerName.toLocaleLowerCase("hu-HU")
       ) ?? null,
-    [players, activePlayerName]
+    [players, activePlayerId, activePlayerName]
   );
 
   const groomPlayer = useMemo(
@@ -685,7 +720,10 @@ function App() {
         setActivePlayerName("");
         setActiveTab("NORMAL");
         sessionStorage.removeItem(SESSION_PLAYER_NAME);
-        await ensureGroomPlayer(room.id, room.groomName);
+        const groomPlayerId = await ensureGroomPlayer(room.id, room.groomName);
+        setActivePlayerId(groomPlayerId);
+        sessionStorage.setItem(SESSION_PLAYER_ID, groomPlayerId);
+        rememberSession({ roomCode: room.roomCode, playerId: groomPlayerId, playerName: room.groomName, mode: "GROOM" });
       }
 
       sessionStorage.setItem(
@@ -728,22 +766,29 @@ function App() {
       setLoading(true);
 
       const isGroomName = normalizedName.toLocaleLowerCase("hu-HU") === joinedRoom.groomName.toLocaleLowerCase("hu-HU");
+      let resolvedPlayerId = "";
       if (isGroomName) {
-        await ensureGroomPlayer(joinedRoom.id, joinedRoom.groomName);
+        resolvedPlayerId = await ensureGroomPlayer(joinedRoom.id, joinedRoom.groomName);
       } else if (!duplicatePlayer) {
-        await addPlayer(joinedRoom.id, normalizedName, joinedRoom.startingPoints);
+        resolvedPlayerId = await addPlayer(joinedRoom.id, normalizedName, joinedRoom.startingPoints);
       } else {
         const existingPlayer = players.find((player) => player.name.toLocaleLowerCase("hu-HU") === normalizedName.toLocaleLowerCase("hu-HU"));
-        if (existingPlayer) await setPlayerPresence(joinedRoom.id, existingPlayer.id, true);
+        if (existingPlayer) {
+          resolvedPlayerId = existingPlayer.id;
+          await setPlayerPresence(joinedRoom.id, existingPlayer.id, true);
+        }
       }
+      if (!resolvedPlayerId) throw new Error("A játékos azonosítása sikertelen.");
 
+      setActivePlayerId(resolvedPlayerId);
       setActivePlayerName(normalizedName);
       setPlayerName(normalizedName);
 
-      sessionStorage.setItem(
-        SESSION_PLAYER_NAME,
-        normalizedName
-      );
+      sessionStorage.setItem(SESSION_PLAYER_ID, resolvedPlayerId);
+      sessionStorage.setItem(SESSION_PLAYER_NAME, normalizedName);
+      sessionStorage.setItem(SESSION_ROOM_CODE, joinedRoom.roomCode);
+      sessionStorage.setItem(SESSION_VIEW_MODE, "COMPANION");
+      rememberSession({ roomCode: joinedRoom.roomCode, playerId: resolvedPlayerId, playerName: normalizedName, mode: "COMPANION" });
     } catch (error) {
       console.error(error);
 
@@ -1379,6 +1424,7 @@ function App() {
     setQuests([]);
     setJokers([]);
     setActivePlayerName("");
+    setActivePlayerId("");
     setCreatedRoomCode("");
     setActiveTab("NORMAL");
     setGroomVisible(false);
@@ -1391,21 +1437,40 @@ function App() {
     sessionStorage.removeItem(
       SESSION_PLAYER_NAME
     );
+    sessionStorage.removeItem(SESSION_PLAYER_ID);
     sessionStorage.removeItem(SESSION_VIEW_MODE);
   }
 
+  function handleForgetAndLeave() {
+    localStorage.removeItem(LOCAL_REMEMBERED_SESSION);
+    handleLeaveRoom();
+  }
+
   useEffect(() => {
-    const savedRoomCode =
-      sessionStorage.getItem(
-        SESSION_ROOM_CODE
-      );
+    const remembered = readRememberedSession();
+    const savedRoomCode = sessionStorage.getItem(SESSION_ROOM_CODE) ?? remembered?.roomCode ?? "";
+    const savedMode = (sessionStorage.getItem(SESSION_VIEW_MODE) as AppViewMode | null) ?? remembered?.mode ?? "COMPANION";
+    if (!sessionStorage.getItem(SESSION_ROOM_CODE) && remembered) {
+      sessionStorage.setItem(SESSION_ROOM_CODE, remembered.roomCode);
+      sessionStorage.setItem(SESSION_VIEW_MODE, remembered.mode);
+      sessionStorage.setItem(SESSION_PLAYER_ID, remembered.playerId);
+      if (remembered.mode === "COMPANION" && remembered.playerName) sessionStorage.setItem(SESSION_PLAYER_NAME, remembered.playerName);
+      setActivePlayerId(remembered.playerId);
+      if (remembered.mode === "COMPANION") {
+        setPlayerName(remembered.playerName);
+        setActivePlayerName(remembered.playerName);
+      }
+    }
 
     if (savedRoomCode) {
-      void handleJoinRoom(
-        savedRoomCode
-      );
+      void handleJoinRoom(savedRoomCode, savedMode);
     }
   }, []);
+
+  useEffect(() => {
+    if (!joinedRoom || !activePlayerId || viewMode !== "COMPANION") return;
+    void setPlayerPresence(joinedRoom.id, activePlayerId, true).catch(() => undefined);
+  }, [joinedRoom?.id, activePlayerId, viewMode]);
 
   useEffect(() => {
     if (!joinedRoom) {
@@ -1434,9 +1499,23 @@ function App() {
       subscribePlayers(
         roomId,
         (updatedPlayers) => {
-          setPlayers(
-            updatedPlayers as PlayerView[]
-          );
+          const nextPlayers = updatedPlayers as PlayerView[];
+          setPlayers(nextPlayers);
+          const rememberedId = sessionStorage.getItem(SESSION_PLAYER_ID) ?? activePlayerId;
+          if (viewMode === "COMPANION" && rememberedId) {
+            const rememberedPlayer = nextPlayers.find((player) => player.id === rememberedId);
+            if (rememberedPlayer) {
+              setActivePlayerId(rememberedPlayer.id);
+              setActivePlayerName(rememberedPlayer.name);
+              setPlayerName(rememberedPlayer.name);
+            } else {
+              setActivePlayerId("");
+              setActivePlayerName("");
+              sessionStorage.removeItem(SESSION_PLAYER_ID);
+              sessionStorage.removeItem(SESSION_PLAYER_NAME);
+              localStorage.removeItem(LOCAL_REMEMBERED_SESSION);
+            }
+          }
         }
       );
 
@@ -1458,7 +1537,7 @@ function App() {
       unsubscribeQuests();
       unsubscribeJokers();
     };
-  }, [joinedRoom?.id]);
+  }, [joinedRoom?.id, activePlayerId, viewMode]);
 
   function renderQuestCard(
     quest: Quest
@@ -1897,6 +1976,7 @@ function App() {
               >
                 🚪 Kilépés a szobából
               </button>
+              <button type="button" className="hamburger-logout" onClick={() => { setMenuOpen(false); handleForgetAndLeave(); }}>🔄 Játékosváltás / elfelejtés</button>
             </aside>
           </div>
         )}
@@ -2212,6 +2292,7 @@ function App() {
             >
               🚪 Kilépés a szobából
             </button>
+            <button type="button" className="hamburger-logout" onClick={() => { setMenuOpen(false); handleForgetAndLeave(); }}>🔄 Játékosváltás / elfelejtés</button>
           </aside>
         </div>
       )}

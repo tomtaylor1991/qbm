@@ -7,6 +7,7 @@ const categories: Record<string, string[]> = {
   "Járművek": ["Lada","Arany Lada","Tuningolt talicska","Bicikli kerék nélkül","Moped a pokolból","Bevásárlókocsi GT","Traktor kulcstartó","Rozsdás roller","Kempingbicikli","Buszmegálló-pad szánkó"],
   "Legendás relikviák": ["Végítélet papucsa","Gábor Zsazsa bugyija","Zámbó Jimmy","Mónika-show mikrofon","Lagzis CD","Műarany nyaklánc","Szent grillsütő","A Nagyi Sodrófája","Kárpát-medencei távkapcsoló","Utolsó ingyenes pálinka"],
   "Állatok": ["Macska","Papagáj","Szent kecske","Kóbor pulyka","Mérges galamb","Támadó hörcsög","Harci csirke","Vad lepke","Mérges tacskó","Kocsmai aranyhal"],
+  "Popkult relikviák": ["Gandalf rezgő botja","Darth Vader asztmapipája","Indiana Jones elveszett szüzessége","Gollam zálogházi gyűrűje","Frodó lábápoló reszelője","Han Solo parkolási bírsága","R2-D2 kávéfőző adaptere","Chewbacca hajszárítója","Berényi Miklós vészcsengője","Magdi anyus gurulós lépcsője","Jay ragacsos sapkája","Néma Bob beszédkártyája","Torrente diplomáciai alsógatyája","Torrente rendőrségi légfrissítője","Indiana Jones hűtőszekrény-biztonsági öve"],
   "Perverz / bizarr": ["Használt dildo","Rózsaszín bilincs","Szőrös tangapáncél","Gumikacsa dominátor","Latex fejfedő","Bajuszos testápoló","Csillámos ostorimitáció","Erotikus kerti törpe","Plüss banán","Gyanús masszírozó"],
   "Celeb / trash ikonok": ["Zámbó Jimmy kazetta","Mónika-show mikrofon","Lagzis CD deluxe","Reality-sztár napszemüveg","Műarany celeb-lánc","Karaoke koronája","Bulvár címlap pajzs","Piros szőnyeg darab","Playback varázspálca","Diszkókirály zakója"],
   "Konyhai fegyverek": ["Fakanál","Fagyasztott hekk","Sodrófa","Levesmerő kard","Reszelőpajzs","Serpenyő","Húsklopfoló","Tésztaszűrő sisak","Kenyérvágó deszka","Habverő lándzsa"],
@@ -16,7 +17,7 @@ const categories: Record<string, string[]> = {
 };
 const rarities: ItemRarity[] = ["COMMON","UNCOMMON","RARE","EPIC","LEGENDARY"];
 const priceBands: Record<ItemRarity,[number,number]> = { COMMON:[10,18], UNCOMMON:[18,28], RARE:[28,42], EPIC:[42,60], LEGENDARY:[60,85] };
-const healNames = new Set(["Sör","Bor","Pálinka","Rejtélyes lötty","Kocsmai vitamin","Savanyú leves","Másnaposság elleni uborka","Energiafröccs","Nagyi húslevese","Titkos elektrolit"]);
+const healNames = new Set(["Sör","Bor","Pálinka","Rejtélyes lötty","Kocsmai vitamin","Savanyú leves","Másnaposság elleni uborka","Energiafröccs","Nagyi húslevese","Titkos elektrolit","Darth Vader asztmapipája"]);
 const petNames = new Set(categories["Harci állatok"]);
 const icons: Record<ItemType,string> = { WEAPON:"⚔️", HEAL:"❤️", BATTLE_PET:"🐾" };
 function hash(s:string){ return [...s].reduce((a,c)=>((a*31+c.charCodeAt(0))>>>0),7); }
@@ -27,7 +28,11 @@ const specials: Record<string,Partial<ShopItem>> = {
  "Romlott uborka":{minDamage:5,maxDamage:11}, "Használt dildo":{minDamage:7,maxDamage:15}, "Gábor Zsazsa bugyija":{minDamage:10,maxDamage:19},
  "Papagáj":{minDamage:8,maxDamage:14}, "Macska":{minDamage:6,maxDamage:17}, "Szent kecske":{actionLives:2,minDamage:18,maxDamage:30}, "Zámbó Jimmy":{minDamage:22,maxDamage:36}, "Arany Lada":{minDamage:26,maxDamage:40},
  "Sör":{minHeal:8,maxHeal:14}, "Bor":{minHeal:12,maxHeal:20}, "Pálinka":{minHeal:18,maxHeal:28}, "Rejtélyes lötty":{minHeal:5,maxHeal:30}, "Kocsmai vitamin":{minHeal:10,maxHeal:18},
- "Harci csirke":{actionLives:3,minDamage:4,maxDamage:7}, "Vad lepke":{actionLives:5,minDamage:2,maxDamage:4}, "Támadó hörcsög":{actionLives:2,minDamage:7,maxDamage:11}, "Mérges galamb":{actionLives:3,minDamage:5,maxDamage:8}, "Kóbor pulyka":{actionLives:4,minDamage:3,maxDamage:6}
+ "Harci csirke":{actionLives:3,minDamage:4,maxDamage:7}, "Vad lepke":{actionLives:5,minDamage:2,maxDamage:4}, "Támadó hörcsög":{actionLives:2,minDamage:7,maxDamage:11}, "Mérges galamb":{actionLives:3,minDamage:5,maxDamage:8}, "Kóbor pulyka":{actionLives:4,minDamage:3,maxDamage:6},
+ "Gandalf rezgő botja":{minDamage:18,maxDamage:29,defense:4}, "Darth Vader asztmapipája":{minHeal:18,maxHeal:27,defense:3}, "Indiana Jones elveszett szüzessége":{minDamage:15,maxDamage:26,defense:2},
+ "Gollam zálogházi gyűrűje":{minDamage:19,maxDamage:31,defense:4}, "Han Solo parkolási bírsága":{minDamage:12,maxDamage:23,defense:2}, "Chewbacca hajszárítója":{minDamage:16,maxDamage:27,defense:3},
+ "Berényi Miklós vészcsengője":{minDamage:13,maxDamage:24,defense:3}, "Magdi anyus gurulós lépcsője":{minDamage:20,maxDamage:32,defense:4}, "Jay ragacsos sapkája":{minDamage:11,maxDamage:22,defense:2},
+ "Néma Bob beszédkártyája":{minDamage:17,maxDamage:28,defense:3}, "Torrente diplomáciai alsógatyája":{minDamage:14,maxDamage:25,defense:3}, "Torrente rendőrségi légfrissítője":{minDamage:12,maxDamage:21,defense:2}
 };
 const result: ShopItem[]=[];
 Object.entries(categories).forEach(([category,names])=>names.forEach((name,index)=>{
@@ -41,5 +46,14 @@ Object.entries(categories).forEach(([category,names])=>names.forEach((name,index
  result.push({id,name,category,rarity,type,price:lo+(base%(hi-lo+1)),icon:icons[type],image:`/images/items/${id}.svg`,...generic,...specials[name]});
 }));
 export const shopCatalog = result;
-export const shopCategories = Object.keys(categories);
+const preferredCategoryOrder = [
+  "Szerszámok",
+  "Heal / fogyóeszközök",
+  "Állatok",
+  "Popkult relikviák"
+];
+export const shopCategories = [
+  ...preferredCategoryOrder,
+  ...Object.keys(categories).filter((category) => !preferredCategoryOrder.includes(category))
+];
 export function getShopItem(id:string){ return shopCatalog.find(i=>i.id===id) ?? null; }
