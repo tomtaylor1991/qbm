@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getShopItem, shopCatalog, shopCategories } from "../../data/shopCatalog";
 import { buyItem, buyRandomFromCategory } from "../../services/shopService";
 import {
@@ -165,20 +165,30 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
   const [phase, setPhase] = useState<"PREVIEW"|"FIGHT"|"DONE">("PREVIEW");
   const [index, setIndex] = useState(0);
   const [showActionCard, setShowActionCard] = useState(false);
-  const battleRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(true);
+  const [autoCloseSeconds, setAutoCloseSeconds] = useState(10);
 
   useEffect(() => {
-    setPhase("PREVIEW"); setIndex(0); setShowActionCard(false);
-    const previewTimer = window.setTimeout(() => setPhase("FIGHT"), 3600);
+    setPhase("PREVIEW");
+    setIndex(0);
+    setShowActionCard(false);
+    setOpen(true);
+    setAutoCloseSeconds(10);
+    const previewTimer = window.setTimeout(() => setPhase("FIGHT"), 3200);
     return () => window.clearTimeout(previewTimer);
   }, [battle]);
 
   useEffect(() => {
+    if (!open) return;
+    document.body.classList.add("battle-modal-open");
+    return () => document.body.classList.remove("battle-modal-open");
+  }, [open]);
+
+  useEffect(() => {
     if (phase !== "FIGHT") return;
-    window.requestAnimationFrame(() => battleRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     if (!battle.log.length) { setPhase("DONE"); return; }
-    // A tényleges csata legalább ~30 másodpercig tartson, hogy minden akció olvasható legyen.
-    const stepMs = Math.max(2300, Math.ceil(30000 / Math.max(1, battle.log.length)));
+    // Az előző verziónál kicsit gyorsabb, de továbbra is olvasható: kb. 27–31 mp egy teljes menet.
+    const stepMs = Math.max(1900, Math.ceil(27000 / Math.max(1, battle.log.length)));
     let actionCardTimer: number | null = null;
     let timer: number | null = null;
     const revealNext = () => {
@@ -186,10 +196,10 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
         const next = Math.min(current + 1, battle.log.length);
         setShowActionCard(true);
         if (actionCardTimer) window.clearTimeout(actionCardTimer);
-        actionCardTimer = window.setTimeout(() => setShowActionCard(false), Math.max(1800, Math.floor(stepMs * 0.78)));
+        actionCardTimer = window.setTimeout(() => setShowActionCard(false), Math.max(1500, Math.floor(stepMs * 0.76)));
         if (next >= battle.log.length) {
           if (timer) window.clearInterval(timer);
-          window.setTimeout(() => setPhase("DONE"), Math.max(700, Math.floor(stepMs * 0.32)));
+          window.setTimeout(() => setPhase("DONE"), Math.max(550, Math.floor(stepMs * 0.28)));
         }
         return next;
       });
@@ -198,7 +208,21 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
     return () => { if (timer) window.clearInterval(timer); if (actionCardTimer) window.clearTimeout(actionCardTimer); };
   }, [phase, battle]);
 
-  if (phase === "PREVIEW") return <LoadoutPreview battle={battle} names={names} ids={ids} />;
+  useEffect(() => {
+    if (phase !== "DONE" || !open) return;
+    setAutoCloseSeconds(10);
+    const interval = window.setInterval(() => {
+      setAutoCloseSeconds((current) => {
+        if (current <= 1) {
+          window.clearInterval(interval);
+          setOpen(false);
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [phase, open, battle]);
 
   const visible = battle.log.slice(0, index);
   const last = visible[visible.length - 1];
@@ -208,7 +232,9 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
   const attackerSide = last && last.actorId === ids[0] ? "left" : "right";
   const winnerSkin = battle.skins[battle.winnerId];
 
-  if (phase === "DONE") {
+  const fightContent = phase === "PREVIEW" ? (
+    <LoadoutPreview battle={battle} names={names} ids={ids} />
+  ) : phase === "DONE" ? (() => {
     const loserName = names[battle.loserId] ?? battle.loserId;
     const finisher = battle.log[battle.log.length - 1];
     const finisherItem = finisher?.itemId ? getShopItem(finisher.itemId) : null;
@@ -226,10 +252,8 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
       </div>
       {footer}
     </>;
-  }
-
-  return <>
-    <div ref={battleRef} className={`battle-stage battle-stage-anchor ${intensity} ${last?.crit ? "crit-hit" : ""}`}>
+  })() : (
+    <div className={`battle-stage battle-stage-anchor ${intensity} ${last?.crit ? "crit-hit" : ""}`}>
       {ids.map((id, sideIndex) => <div key={id} className={`fighter fighter-${sideIndex === 0 ? "left" : "right"} ${last?.defenderId === id && last.damage ? "fighter-hit" : ""} ${last?.actorId === id && last.heal ? "fighter-heal" : ""}`}>
         <strong>{names[id] ?? id}</strong><small>{battle.skins[id]}</small>
         <div className="hp-shell"><div className="hp-fill" style={{ width: `${Math.max(0, Math.min(100, ((hp[id] ?? 0) / Math.max(1, initial[id] ?? 100)) * 100))}%` }} /></div>
@@ -237,7 +261,7 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
         <div className="pixel-fighter" aria-label={battle.skins[id]}>{skinVisual[battle.skins[id]] ?? "⚔️"}</div>
       </div>)}
       <div className="battle-center">
-        {phase === "FIGHT" && last && <div key={`p-${last.turn}`} className={`projectile projectile-${attackerSide} ${last.actionType.toLowerCase()} ${last.crit ? "projectile-crit" : ""}`}>
+        {last && <div key={`p-${last.turn}`} className={`projectile projectile-${attackerSide} ${last.actionType.toLowerCase()} ${last.crit ? "projectile-crit" : ""}`}>
           {item ? <img src={item.image} alt={item.name} /> : <span>👊</span>}
         </div>}
         {last && <div key={`f-${last.turn}`} className={`floating-number ${last.heal ? "floating-heal" : "floating-damage"} float-${last.defenderId === ids[0] ? "left" : "right"}`}>{last.heal ? `+${last.heal}` : `−${last.damage ?? 0}`}{last.crit ? " CRIT!" : ""}</div>}
@@ -249,7 +273,25 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
         <div className="battle-log-rich">{visible.slice(-3).map((action, idx, arr) => <BattleEvent key={action.turn} action={action} names={names} active={idx===arr.length-1}/>)}</div>
       </div>
     </div>
-  </>;
+  );
+
+  if (!open) {
+    return <div className="battle-closed-summary">
+      <b>🏆 {names[battle.winnerId] ?? battle.winnerId} győzött</b>
+      <button type="button" onClick={() => setOpen(true)}>⚔ Csata újranyitása</button>
+    </div>;
+  }
+
+  return <div className={`battle-modal ${phase === "DONE" ? "battle-modal-done" : ""}`} role="dialog" aria-modal="true" aria-label="Csata">
+    <div className="battle-modal-shell">
+      <div className="battle-modal-topbar">
+        <span>{phase === "PREVIEW" ? "🎰 CSATA ELŐKÉSZÍTÉS" : phase === "FIGHT" ? "⚔ CSATA FOLYAMATBAN" : `🏁 CSATA VÉGE · bezárás ${autoCloseSeconds}s`}</span>
+        <button type="button" className="battle-modal-close" onClick={() => setOpen(false)} aria-label="Csata bezárása">✕</button>
+      </div>
+      <div className="battle-modal-content">{fightContent}</div>
+      {phase === "DONE" && <button type="button" className="battle-modal-auto-close" onClick={() => setOpen(false)}>Bezárás most · automatikusan {autoCloseSeconds}s</button>}
+    </div>
+  </div>;
 }
 
 function ArenaHelp() {
