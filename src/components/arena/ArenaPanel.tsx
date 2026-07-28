@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getShopItem, shopCatalog, shopCategories } from "../../data/shopCatalog";
 import { buyItem, buyRandomFromCategory } from "../../services/shopService";
 import {
@@ -187,8 +187,8 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
   useEffect(() => {
     if (phase !== "FIGHT") return;
     if (!battle.log.length) { setPhase("DONE"); return; }
-    // Az előző verziónál kicsit gyorsabb, de továbbra is olvasható: kb. 27–31 mp egy teljes menet.
-    const stepMs = Math.max(1900, Math.ceil(27000 / Math.max(1, battle.log.length)));
+    // Kb. 20%-kal gyorsabb playback az előző verziónál, miközben az akciókártya még olvasható marad.
+    const stepMs = Math.max(1520, Math.ceil(21600 / Math.max(1, battle.log.length)));
     let actionCardTimer: number | null = null;
     let timer: number | null = null;
     const revealNext = () => {
@@ -196,7 +196,7 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
         const next = Math.min(current + 1, battle.log.length);
         setShowActionCard(true);
         if (actionCardTimer) window.clearTimeout(actionCardTimer);
-        actionCardTimer = window.setTimeout(() => setShowActionCard(false), Math.max(1500, Math.floor(stepMs * 0.76)));
+        actionCardTimer = window.setTimeout(() => setShowActionCard(false), Math.max(1200, Math.floor(stepMs * 0.76)));
         if (next >= battle.log.length) {
           if (timer) window.clearInterval(timer);
           window.setTimeout(() => setPhase("DONE"), Math.max(550, Math.floor(stepMs * 0.28)));
@@ -308,6 +308,7 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
   const [pveResult, setPveResult] = useState<any>(null);
   const [purchaseFx, setPurchaseFx] = useState<{item:ShopItem;paid:number}|null>(null);
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
+  const scrolledLoadoutChallengeRef = useRef<string | null>(null);
 
   useEffect(() => subscribeArenaPlayers(roomId, setPlayers), [roomId]);
   useEffect(() => subscribeChallenges(roomId, playerId, setChallenges), [roomId, playerId]);
@@ -345,6 +346,25 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
     if (current) setActiveChallengeId(current.id);
   }, [challenges, mode, activeChallengeId]);
 
+  const activeChallenge = activeChallengeId ? challenges.find((challenge) => challenge.id === activeChallengeId) ?? null : null;
+
+  useEffect(() => {
+    if (mode !== "PVP" || !activeChallenge) return;
+    const loadoutPhase = ["ACCEPTED", "LOADOUT", "READY"].includes(activeChallenge.state);
+    const accepted = Boolean(activeChallenge.acceptedAt) && activeChallenge.acceptedBy === activeChallenge.challengedId;
+    if (!loadoutPhase || !accepted || activeChallenge.battle) return;
+    if (scrolledLoadoutChallengeRef.current === activeChallenge.id) return;
+
+    scrolledLoadoutChallengeRef.current = activeChallenge.id;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`pvp-loadout-${activeChallenge.id}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeChallenge, mode]);
+
   const me = players.find((player) => player.id === playerId);
   useEffect(() => {
     if (!me) return;
@@ -361,7 +381,8 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
     catch (error) { setMessage(error instanceof Error ? error.message : "Hiba"); }
   };
 
-  if (mode === "SHOP") return <section className="arena-panel">
+  if (mode === "SHOP") return <section className="arena-panel shop-panel">
+    <div className="shop-balance-float" role="status" aria-live="polite" aria-label={`Aktuális egyenleg: ${me.huntPoints} pont`}>💰 <b>{me.huntPoints}</b> pont</div>
     <h2>🛒 Abszurd Shop</h2><p>Egyenleg: <b>{me.huntPoints}</b> személyes pont</p>
     <nav className="shop-category-nav" aria-label="Shop kategóriák">{shopCategories.map(category=><button key={category} onClick={()=>document.getElementById(categoryId(category))?.scrollIntoView({behavior:"smooth",block:"start"})}>{category}</button>)}</nav>
     {shopCategories.map((category) => <div key={category} id={categoryId(category)} className="shop-category">
@@ -392,7 +413,6 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
     <ArenaHelp /><p>{message}</p></section>;
 
   const incoming = challenges.filter((challenge) => challenge.challengedId === me.id && challenge.state === "PENDING" && !challengeIsExpired(challenge));
-  const activeChallenge = activeChallengeId ? challenges.find((challenge) => challenge.id === activeChallengeId) ?? null : null;
   return <section className="arena-panel"><h2>⚔ PvP Aréna</h2>
     <div className="challenge-create"><select value={target} onChange={(event) => setTarget(event.target.value)}><option value="">Válassz ellenfelet</option>{active.map((player) => <option key={player.id} value={player.id}>{player.isGroom ? "🤵 " : ""}{player.name}</option>)}</select><input aria-label="PvP tét" type="number" min={0} max={Math.max(0, me.huntPoints)} value={stake} onChange={(event) => setStake(Math.min(Math.max(0, Number(event.target.value) || 0), Math.max(0, me.huntPoints)))} /><button onClick={async () => {
       const opponent = players.find((player) => player.id === target) ?? active[Math.floor(Math.random() * active.length)];
@@ -417,7 +437,7 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
     {activeChallenge && activeChallenge.state === "EXPIRED" && <div className="challenge-card"><b>⌛ A PvP meghívás lejárt.</b><span> A tét visszajár, új kihívást kell küldeni.</span></div>}
     {activeChallenge && activeChallenge.state === "PENDING" && activeChallenge.challengerId === me.id && <div className="challenge-card"><b>⏳ Kihívás elküldve: {activeChallenge.challengedName}</b><span> · {activeChallenge.stake} pont · 2 percig érvényes</span><button onClick={async()=>{try{await setChallengeState(roomId,activeChallenge.id,"CANCELLED",me.id);setActiveChallengeId(null);setLoadout(empty);setMessage("Kihívás visszavonva.");}catch(error){setMessage(error instanceof Error?error.message:"Hiba");}}}>Visszavonás</button></div>}
     {activeChallenge && activeChallenge.state !== "PENDING" && !["DECLINED","CANCELLED","EXPIRED"].includes(activeChallenge.state) && <div key={activeChallenge.id} className="challenge-card active-battle-card"><h3>{activeChallenge.challengerName} vs {activeChallenge.challengedName} · {activeChallenge.stake} pont</h3>
-      {!activeChallenge.battle && <><LoadoutPicker player={me} value={loadout} onChange={setLoadout} /><div className="ready-row"><span>{activeChallenge.challengerName}: {activeChallenge.challengerReady ? "✅ KÉSZ" : "⏳ választ"}</span><span>{activeChallenge.challengedName}: {activeChallenge.challengedReady ? "✅ KÉSZ" : "⏳ választ"}</span></div><button onClick={async () => {
+      {!activeChallenge.battle && <><div id={`pvp-loadout-${activeChallenge.id}`} className="pvp-loadout-anchor"><LoadoutPicker player={me} value={loadout} onChange={setLoadout} /></div><div className="ready-row"><span>{activeChallenge.challengerName}: {activeChallenge.challengerReady ? "✅ KÉSZ" : "⏳ választ"}</span><span>{activeChallenge.challengedName}: {activeChallenge.challengedReady ? "✅ KÉSZ" : "⏳ választ"}</span></div><button onClick={async () => {
         try { validateLoadout(me.inventory, loadout); await submitLoadout(roomId, activeChallenge.id, me.id, loadout); setMessage("KÉSZ — a csata csak akkor indul, ha a kihívást elfogadták és mindketten készek."); }
         catch (error) { setMessage(error instanceof Error ? error.message : "Hiba"); }
       }}>KÉSZ</button></>}

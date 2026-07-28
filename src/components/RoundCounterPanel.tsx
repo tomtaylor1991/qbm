@@ -17,7 +17,7 @@ export default function RoundCounterPanel({ roomId, players, activePlayer }: Pro
     }
 
     const label = roundType === "BEER" ? "sörkört" : "töménykört";
-    if (!window.confirm(`Biztosan vettél egy ${label} az egész társaságnak?\n\nJutalom: +50 pont`)) return;
+    if (!window.confirm(`Biztosan vettél egy ${label} az egész társaságnak?\n\nJutalom: +100 pont`)) return;
 
     try {
       setSaving(roundType);
@@ -32,7 +32,7 @@ export default function RoundCounterPanel({ roomId, players, activePlayer }: Pro
   return (
     <section className="mini-game-panel">
       <h2>🍻 Italhősök</h2>
-      <p>Csak az egész társaságnak vásárolt kör számít. Minden kör +50 személyes pont.</p>
+      <p>Csak az egész társaságnak vásárolt kör számít. Minden kör +100 személyes pont.</p>
 
       <div className="round-list">
         {players.map((player) => {

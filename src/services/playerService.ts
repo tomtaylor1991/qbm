@@ -175,7 +175,7 @@ export async function registerRoundPurchase(
 ): Promise<void> {
   const counterField = roundType === "BEER" ? "beerRounds" : "spiritRounds";
   await updateDoc(doc(db, "rooms", roomId, "players", playerId), {
-    huntPoints: increment(50),
+    huntPoints: increment(100),
     [counterField]: increment(1)
   });
 }
