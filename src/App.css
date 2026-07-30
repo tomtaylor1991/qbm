@@ -1856,3 +1856,56 @@ label {
   .hamburger-room-summary { margin: 12px 0; padding: 10px; }
   button, input, select, textarea { max-width: 100%; }
 }
+
+/* Menu grouping + active view navigation */
+.hamburger-separator{height:2px;margin:10px 4px;background:#33425f;opacity:.95}
+.active-view-anchor{height:1px;scroll-margin-top:72px}
+
+/* Persely / közös kassza */
+.piggy-panel{margin-top:24px;padding:18px;border:3px solid #4c648d;background:#1a2338;box-shadow:6px 6px 0 #05070d}
+.piggy-title{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.piggy-title h2{margin:0 0 6px}.piggy-title p{margin:0;color:#c7d5ee}.piggy-title>strong{font-size:1.35rem;color:#f0d38a;white-space:nowrap}
+.piggy-form{display:grid;grid-template-columns:1.4fr .7fr;gap:10px;margin:18px 0}.piggy-form label{display:flex;flex-direction:column;gap:5px;font-weight:800}.piggy-form input{width:100%;box-sizing:border-box}.piggy-note{grid-column:1/-1}.piggy-form button{grid-column:1/-1}.piggy-message{padding:8px 10px;border:2px solid #33425f;background:#111827}
+.piggy-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin:14px 0}.piggy-summary-card{display:flex;flex-direction:column;gap:4px;padding:10px;border:2px solid #33425f;background:#111827}.piggy-summary-card span{font-size:.84rem;color:#d7e4ff}
+.piggy-list{display:flex;flex-direction:column;gap:8px;margin:14px 0}.piggy-list article{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px;border:2px solid #33425f;background:#222d45}.piggy-list article>div{display:flex;min-width:0;flex-direction:column;gap:2px}.piggy-list article span,.piggy-list article small{color:#c7d5ee;font-size:.78rem}.piggy-list article>b{color:#f0d38a;white-space:nowrap}.piggy-delete{min-width:40px;padding:7px}
+.piggy-calc{width:100%;margin-top:8px}.piggy-settlement{margin-top:14px;padding:14px;border:3px solid #f0d38a;background:#111827}.piggy-settlement h3{margin-top:0}.piggy-settlement ol{display:flex;flex-direction:column;gap:8px;padding-left:22px}.piggy-settlement li strong{color:#f0d38a}
+@media(max-width:520px){.active-view-anchor{scroll-margin-top:52px}.piggy-panel{padding:12px}.piggy-form{grid-template-columns:1fr}.piggy-note,.piggy-form button{grid-column:1}.piggy-list article{grid-template-columns:minmax(0,1fr) auto}.piggy-delete{grid-column:2}.piggy-title>strong{font-size:1.05rem}}
+
+/* Persely: biztos sortörés keskeny nézeteken */
+.piggy-panel,
+.piggy-settlement,
+.piggy-settlement p,
+.piggy-settlement li {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.piggy-settlement p,
+.piggy-settlement li,
+.piggy-settlement b,
+.piggy-settlement strong {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.piggy-settlement ol {
+  margin: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 520px) {
+  .piggy-settlement {
+    padding: 10px;
+  }
+  .piggy-settlement h3 {
+    font-size: 1.05rem;
+    line-height: 1.2;
+  }
+  .piggy-settlement p,
+  .piggy-settlement li {
+    font-size: .82rem;
+    line-height: 1.35;
+  }
+  .piggy-settlement ol {
+    padding-left: 18px;
+    gap: 6px;
+  }
+}

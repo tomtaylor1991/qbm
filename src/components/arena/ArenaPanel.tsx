@@ -160,7 +160,7 @@ function BattleEvent({ action, names, active }: { action: BattleLogEntry; names:
   </div>;
 }
 
-function BattleView({ battle, names, footer }: { battle: BattleResult; names: Record<string, string>; footer?: ReactNode }) {
+function BattleView({ battle, names, footer, battleKey }: { battle: BattleResult; names: Record<string, string>; footer?: ReactNode; battleKey?: string }) {
   const ids = Object.keys(battle.skins);
   const [phase, setPhase] = useState<"PREVIEW"|"FIGHT"|"DONE">("PREVIEW");
   const [index, setIndex] = useState(0);
@@ -176,7 +176,7 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
     setAutoCloseSeconds(10);
     const previewTimer = window.setTimeout(() => setPhase("FIGHT"), 3200);
     return () => window.clearTimeout(previewTimer);
-  }, [battle]);
+  }, [battleKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -206,7 +206,7 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
     };
     timer = window.setInterval(revealNext, stepMs);
     return () => { if (timer) window.clearInterval(timer); if (actionCardTimer) window.clearTimeout(actionCardTimer); };
-  }, [phase, battle]);
+  }, [phase, battleKey]);
 
   useEffect(() => {
     if (phase !== "DONE" || !open) return;
@@ -222,7 +222,7 @@ function BattleView({ battle, names, footer }: { battle: BattleResult; names: Re
       });
     }, 1000);
     return () => window.clearInterval(interval);
-  }, [phase, open, battle]);
+  }, [phase, open, battleKey]);
 
   const visible = battle.log.slice(0, index);
   const last = visible[visible.length - 1];
@@ -331,20 +331,41 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
   useEffect(() => {
     if (mode !== "PVP") return;
 
-    // If the user has explicitly focused a challenge (including a freshly-created
-    // PENDING challenge that has not reached this snapshot yet), never replace it
-    // with an older READY/FIGHTING document from a stale realtime snapshot.
-    if (activeChallengeId) return;
-
-    const current = challenges.find((challenge) =>
-      ["ACCEPTED", "LOADOUT", "READY", "FIGHTING"].includes(challenge.state) &&
-      (challenge.state === "FIGHTING" || !challengeIsExpired(challenge)) &&
-      Boolean(challenge.acceptedAt) &&
-      challenge.acceptedBy === challenge.challengedId &&
-      !challenge.settled
+    const relevant = challenges.filter((challenge) =>
+      (challenge.challengerId === playerId || challenge.challengedId === playerId) &&
+      !["DECLINED", "CANCELLED", "EXPIRED"].includes(challenge.state) &&
+      (challenge.state === "FIGHTING" || challenge.state === "FINISHED" || !challengeIsExpired(challenge))
     );
-    if (current) setActiveChallengeId(current.id);
-  }, [challenges, mode, activeChallengeId]);
+    const newest = relevant[0] ?? null; // subscribeChallenges createdAt DESC sorrendben adja.
+    if (!newest) {
+      setActiveChallengeId(null);
+      return;
+    }
+
+    if (!activeChallengeId) {
+      setActiveChallengeId(newest.id);
+      return;
+    }
+
+    const focused = challenges.find((challenge) => challenge.id === activeChallengeId) ?? null;
+    if (!focused) {
+      setActiveChallengeId(newest.id);
+      return;
+    }
+
+    // Egy lezárt korábbi meccs soha ne tartsa fókuszban a klienst, ha közben
+    // újabb PENDING/ACCEPTED/LOADOUT/READY/FIGHTING challenge érkezett.
+    const focusedTerminal = focused.settled || focused.state === "FINISHED";
+    const focusedInvalid = ["DECLINED", "CANCELLED", "EXPIRED"].includes(focused.state) ||
+      (focused.state !== "FIGHTING" && challengeIsExpired(focused));
+    const newestIsLive = ["PENDING", "ACCEPTED", "LOADOUT", "READY", "FIGHTING"].includes(newest.state) && !newest.settled;
+    // Folyamatban lévő challenge-et egy újabb bejövő meghívás sem szakíthat meg.
+    // Váltani csak akkor szabad, ha a fókuszált challenge már lezárt/érvénytelen.
+    if (newest.id !== focused.id && newestIsLive && (focusedTerminal || focusedInvalid)) {
+      setLoadout(empty);
+      setActiveChallengeId(newest.id);
+    }
+  }, [challenges, mode, activeChallengeId, playerId]);
 
   const activeChallenge = activeChallengeId ? challenges.find((challenge) => challenge.id === activeChallengeId) ?? null : null;
 
@@ -409,7 +430,7 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
       try { validateLoadout(me.inventory, loadout); setPveResult(null); setMessage("🎲 Saját loadout lezárva, 2 fegyver + 1 heal sorsolása…"); setPveResult(await runPve(roomId, me, difficulty, loadout)); }
       catch (error) { setMessage(error instanceof Error ? error.message : "Hiba"); }
     }}>{label}</button>)}</div>
-    {pveResult && <BattleView battle={pveResult.battle} names={{ [me.id]: me.name, "PVE-EASY": pveResult.enemyName, "PVE-MEDIUM": pveResult.enemyName, "PVE-HARD": pveResult.enemyName }} footer={<div className="loss-scene compact-settlement"><h3>{pveResult.battle.winnerId === me.id ? "🏆 Győzelem ára" : "💀 A vereség ára"}</h3><p>{pveResult.lostItems.map((id: string) => getShopItem(id)?.name ?? id).join(", ") || "Nem volt elveszíthető tárgy."}</p><b>Jutalom: {pveResult.reward} pont</b>{pveResult.giftItemId && <p>🎁 Ajándék: {getShopItem(pveResult.giftItemId)?.name ?? pveResult.giftItemId}</p>}</div>} />}
+    {pveResult && <BattleView battle={pveResult.battle} battleKey={pveResult.battleId} names={{ [me.id]: me.name, "PVE-EASY": pveResult.enemyName, "PVE-MEDIUM": pveResult.enemyName, "PVE-HARD": pveResult.enemyName }} footer={<div className="loss-scene compact-settlement"><h3>{pveResult.battle.winnerId === me.id ? "🏆 Győzelem ára" : "💀 A vereség ára"}</h3><p>{pveResult.lostItems.map((id: string) => getShopItem(id)?.name ?? id).join(", ") || "Nem volt elveszíthető tárgy."}</p><b>Jutalom: {pveResult.reward} pont</b>{pveResult.giftItemId && <p>🎁 Ajándék: {getShopItem(pveResult.giftItemId)?.name ?? pveResult.giftItemId}</p>}</div>} />}
     <ArenaHelp /><p>{message}</p></section>;
 
   const incoming = challenges.filter((challenge) => challenge.challengedId === me.id && challenge.state === "PENDING" && !challengeIsExpired(challenge));
@@ -433,7 +454,7 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
     }}>{target ? "Kihívás" : "🎲 Random ellenfél"}</button></div>
     <div className="pvp-quick-status"><span>💰 Egyenleg: <b>{me.huntPoints}</b></span><span>👥 Aktív ellenfelek: <b>{active.length}</b></span><span>🎯 Tét: <b>{stake}</b></span></div>
     {active.length > 0 && <div className="pvp-opponent-chips" aria-label="Gyors ellenfélválasztás">{active.map((player) => <button key={player.id} type="button" className={target === player.id ? "is-selected" : ""} onClick={() => setTarget(player.id)}>{player.isGroom ? "🤵 " : "⚔️ "}{player.name}</button>)}</div>}
-    {incoming.map((challenge) => <div className="challenge-card" key={challenge.id}><b>{challenge.challengerName}</b> kihívott {challenge.stake} pontért · 2 percig érvényes <button onClick={() => { setActiveChallengeId(challenge.id); void setChallengeState(roomId, challenge.id, "ACCEPTED", me.id); }}>Elfogadom</button><button onClick={() => void setChallengeState(roomId, challenge.id, "DECLINED", me.id)}>Elutasítom</button></div>)}
+    {incoming.map((challenge) => <div className="challenge-card" key={challenge.id}><b>{challenge.challengerName}</b> kihívott {challenge.stake} pontért · 2 percig érvényes <button onClick={async () => { try { await setChallengeState(roomId, challenge.id, "ACCEPTED", me.id); setLoadout(empty); setActiveChallengeId(challenge.id); } catch (error) { setMessage(error instanceof Error ? error.message : "Hiba"); } }}>Elfogadom</button><button onClick={() => void setChallengeState(roomId, challenge.id, "DECLINED", me.id)}>Elutasítom</button></div>)}
     {activeChallenge && activeChallenge.state === "EXPIRED" && <div className="challenge-card"><b>⌛ A PvP meghívás lejárt.</b><span> A tét visszajár, új kihívást kell küldeni.</span></div>}
     {activeChallenge && activeChallenge.state === "PENDING" && activeChallenge.challengerId === me.id && <div className="challenge-card"><b>⏳ Kihívás elküldve: {activeChallenge.challengedName}</b><span> · {activeChallenge.stake} pont · 2 percig érvényes</span><button onClick={async()=>{try{await setChallengeState(roomId,activeChallenge.id,"CANCELLED",me.id);setActiveChallengeId(null);setLoadout(empty);setMessage("Kihívás visszavonva.");}catch(error){setMessage(error instanceof Error?error.message:"Hiba");}}}>Visszavonás</button></div>}
     {activeChallenge && activeChallenge.state !== "PENDING" && !["DECLINED","CANCELLED","EXPIRED"].includes(activeChallenge.state) && <div key={activeChallenge.id} className="challenge-card active-battle-card"><h3>{activeChallenge.challengerName} vs {activeChallenge.challengedName} · {activeChallenge.stake} pont</h3>
@@ -441,7 +462,7 @@ export default function ArenaPanel({ roomId, playerId, mode }: { roomId: string;
         try { validateLoadout(me.inventory, loadout); await submitLoadout(roomId, activeChallenge.id, me.id, loadout); setMessage("KÉSZ — a csata csak akkor indul, ha a kihívást elfogadták és mindketten készek."); }
         catch (error) { setMessage(error instanceof Error ? error.message : "Hiba"); }
       }}>KÉSZ</button></>}
-      {activeChallenge.battle && activeChallenge.battleChallengeId === activeChallenge.id && Boolean(activeChallenge.acceptedAt) && activeChallenge.acceptedBy === activeChallenge.challengedId && activeChallenge.challengerReady && activeChallenge.challengedReady && <BattleView battle={activeChallenge.battle} names={{ [activeChallenge.challengerId]: activeChallenge.challengerName, [activeChallenge.challengedId]: activeChallenge.challengedName }} footer={activeChallenge.state === "FINISHED" ? <div className="loss-scene compact-settlement"><h3>{activeChallenge.battle.winnerId === me.id ? "🏆 Győzelem ára" : "💀 A vereség ára"}</h3><p>{(activeChallenge.battle.winnerId === me.id ? activeChallenge.winnerLost : activeChallenge.loserLost)?.map((id) => getShopItem(id)?.name ?? id).join(", ") || "Nem veszett el saját tárgy."}</p>{activeChallenge.battle.winnerId === me.id && activeChallenge.giftItemId && <b>🎁 {getShopItem(activeChallenge.giftItemId)?.name ?? activeChallenge.giftItemId}</b>}</div> : <div className="settlement-wait">⏳ Eredmény elszámolása…</div>} />}
+      {activeChallenge.battle && activeChallenge.battleChallengeId === activeChallenge.id && Boolean(activeChallenge.acceptedAt) && activeChallenge.acceptedBy === activeChallenge.challengedId && activeChallenge.challengerReady && activeChallenge.challengedReady && <BattleView battle={activeChallenge.battle} battleKey={activeChallenge.id} names={{ [activeChallenge.challengerId]: activeChallenge.challengerName, [activeChallenge.challengedId]: activeChallenge.challengedName }} footer={activeChallenge.state === "FINISHED" ? <div className="loss-scene compact-settlement"><h3>{activeChallenge.battle.winnerId === me.id ? "🏆 Győzelem ára" : "💀 A vereség ára"}</h3><p>{(activeChallenge.battle.winnerId === me.id ? activeChallenge.winnerLost : activeChallenge.loserLost)?.map((id) => getShopItem(id)?.name ?? id).join(", ") || "Nem veszett el saját tárgy."}</p>{activeChallenge.battle.winnerId === me.id && activeChallenge.giftItemId && <b>🎁 {getShopItem(activeChallenge.giftItemId)?.name ?? activeChallenge.giftItemId}</b>}</div> : <div className="settlement-wait">⏳ Eredmény elszámolása…</div>} />}
     </div>}
     <h3>🏆 Dicsőség fala</h3><ol className="ranking">{ranked.map((player, index) => <li key={player.id}><span>{index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index + 1}.`}</span><b>{player.name}</b><span>{player.pvpWins} győzelem · {player.pvpPointsWon} pont</span></li>)}</ol>
     <ArenaHelp /><p>{message}</p>

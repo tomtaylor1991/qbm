@@ -196,8 +196,8 @@ function shuffleSymbols(symbols: [number, number, number]): [number, number, num
 function createSlotResult(): Omit<SlotSpinResult, "balanceAfter"> {
   const roll = Math.random();
 
-  // 45%: nincs nyeremény — három különböző szimbólum.
-  if (roll < 0.45) {
+  // 55%: nincs nyeremény — három különböző szimbólum.
+  if (roll < 0.55) {
     const available = [0, 1, 2, 3, 4, 5, 6, 7, 8];
     const first = randomFrom(available);
     const second = randomFrom(available.filter((symbol) => symbol !== first));
@@ -207,8 +207,8 @@ function createSlotResult(): Omit<SlotSpinResult, "balanceAfter"> {
     return { symbols: shuffleSymbols([first, second, third]), payout: 0, jackpot: false };
   }
 
-  // 32%: két azonos — a játékos visszakapja a 10 pontos tétet.
-  if (roll < 0.77) {
+  // 27%: két azonos — kisebb nyeremény.
+  if (roll < 0.82) {
     const pair = randomFrom([0, 1, 2, 3, 4, 5, 6, 7]);
     const different = randomFrom(
       [0, 1, 2, 3, 4, 5, 6, 7, 8].filter((symbol) => symbol !== pair)
@@ -216,13 +216,13 @@ function createSlotResult(): Omit<SlotSpinResult, "balanceAfter"> {
     return { symbols: shuffleSymbols([pair, pair, different]), payout: 10, jackpot: false };
   }
 
-  // 17%: három gyakori szimbólum.
-  if (roll < 0.94) {
+  // 13%: három gyakori szimbólum.
+  if (roll < 0.95) {
     const symbol = randomFrom([0, 1, 2, 3, 4]);
     return { symbols: [symbol, symbol, symbol], payout: 30, jackpot: false };
   }
 
-  // 5%: három ritka szimbólum.
+  // 4%: három ritka szimbólum.
   if (roll < 0.99) {
     const symbol = randomFrom([5, 6, 7]);
     return { symbols: [symbol, symbol, symbol], payout: 50, jackpot: false };

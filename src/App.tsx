@@ -18,6 +18,7 @@ import SurvivorDraw from "./components/SurvivorDraw";
 import GroomGameView from "./components/GroomGameView";
 import ArenaPanel from "./components/arena/ArenaPanel";
 import ChallengePopup from "./components/arena/ChallengePopup";
+import PiggyBankPanel from "./components/PiggyBankPanel";
 
 import {
   createRoom,
@@ -106,6 +107,7 @@ type GameTab =
   | "INVENTORY"
   | "PVP"
   | "PVE"
+  | "PIGGY"
   | "COMPLETED"
   | "ADD";
 
@@ -268,6 +270,14 @@ function App() {
 
   const [activeTab, setActiveTab] =
     useState<GameTab>("NORMAL");
+
+  const navigateFromMenu = useCallback((tab: GameTab, anchorId: string) => {
+    setActiveTab(tab);
+    setMenuOpen(false);
+    window.setTimeout(() => {
+      document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 40);
+  }, []);
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -1905,8 +1915,10 @@ function App() {
 
   if (viewMode === "GROOM") {
     const groomCertificateUnlocked = joinedRoom.currentXp >= joinedRoom.targetXp;
-    const groomMenuItems = [
-      ["NORMAL", "🎯", groomCertificateUnlocked ? "Aktuális feladat & kalandlevél" : "Aktuális feladat"],
+    const groomMainMenuItems = [
+      ["NORMAL", "🎯", groomCertificateUnlocked ? "Aktuális feladat & kalandlevél" : "Aktuális feladat"]
+    ] as const;
+    const groomMiniGameItems = [
       ["SHOP", "🛒", "Shop"],
       ["INVENTORY", "🎒", "Inventory"],
       ["PVP", "⚔️", "PvP Aréna"],
@@ -1955,20 +1967,20 @@ function App() {
               </div>
 
               <nav className="hamburger-menu-list">
-                {groomMenuItems.map(([tab, icon, label]) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    className={activeTab === tab ? "is-active" : ""}
-                    onClick={() => { setActiveTab(tab); setMenuOpen(false); }}
-                  >
-                    <span aria-hidden="true">{icon}</span>
-                    <span>{label}</span>
-                    {activeTab === tab && <b>●</b>}
+                {groomMainMenuItems.map(([tab, icon, label]) => (
+                  <button key={tab} type="button" className={activeTab === tab ? "is-active" : ""} onClick={() => navigateFromMenu(tab, "groom-active-view-anchor")}>
+                    <span aria-hidden="true">{icon}</span><span>{label}</span>{activeTab === tab && <b>●</b>}
+                  </button>
+                ))}
+                <div className="hamburger-separator" aria-hidden="true" />
+                {groomMiniGameItems.map(([tab, icon, label]) => (
+                  <button key={tab} type="button" className={activeTab === tab ? "is-active" : ""} onClick={() => navigateFromMenu(tab, "groom-active-view-anchor")}>
+                    <span aria-hidden="true">{icon}</span><span>{label}</span>{activeTab === tab && <b>●</b>}
                   </button>
                 ))}
               </nav>
 
+              <div className="hamburger-separator" aria-hidden="true" />
               <button
                 type="button"
                 className="hamburger-logout"
@@ -1989,6 +2001,7 @@ function App() {
           />
         )}
 
+        <div id="groom-active-view-anchor" className="active-view-anchor" />
         {activeTab === "NORMAL" && (
           <GroomGameView
             room={joinedRoom}
@@ -2208,6 +2221,11 @@ function App() {
           {activeTab === "ROUNDS" && "🍻 Körök"}
           {activeTab === "SLOT" && "🎰 Kaszinó"}
           {activeTab === "DRAW" && "🎲 Sorsolás"}
+          {activeTab === "SHOP" && "🛒 Shop"}
+          {activeTab === "INVENTORY" && "🎒 Inventory"}
+          {activeTab === "PVP" && "⚔️ PvP Aréna"}
+          {activeTab === "PVE" && "👹 PvE Aréna"}
+          {activeTab === "PIGGY" && "🐷 Persely"}
           {activeTab === "COMPLETED" && "📜 Teljesítve"}
           {activeTab === "ADD" && "➕ Új feladat"}
         </strong>
@@ -2257,31 +2275,30 @@ function App() {
                 ["PUNISHMENT", "😈", "Büntetés"],
                 ["JOKERS", "🃏", "Jokerek"],
                 ["ROUNDS", "🍻", "Ital körök"],
-                ["SLOT", "🎰", "Kaszinó"],
-                ["DRAW", "🎲", "Survivor draw"],
+                ["COMPLETED", "📜", "Teljesített"],
+                ["ADD", "➕", "Új feladat"],
+                ["PIGGY", "🐷", "Persely"]
+              ] as const).map(([tab, icon, label]) => (
+                <button key={tab} type="button" className={activeTab === tab ? "is-active" : ""} onClick={() => navigateFromMenu(tab, "companion-active-view-anchor")}>
+                  <span aria-hidden="true">{icon}</span><span>{label}</span>{activeTab === tab && <b>●</b>}
+                </button>
+              ))}
+              <div className="hamburger-separator" aria-hidden="true" />
+              {([
                 ["SHOP", "🛒", "Shop"],
                 ["INVENTORY", "🎒", "Inventory"],
                 ["PVP", "⚔️", "PvP Aréna"],
                 ["PVE", "👹", "PvE Aréna"],
-                ["COMPLETED", "📜", "Teljesített"],
-                ["ADD", "➕", "Új feladat"]
+                ["SLOT", "🎰", "Kaszinó"],
+                ["DRAW", "🎲", "Survivor draw"]
               ] as const).map(([tab, icon, label]) => (
-                <button
-                  key={tab}
-                  type="button"
-                  className={activeTab === tab ? "is-active" : ""}
-                  onClick={() => {
-                    setActiveTab(tab);
-                    setMenuOpen(false);
-                  }}
-                >
-                  <span aria-hidden="true">{icon}</span>
-                  <span>{label}</span>
-                  {activeTab === tab && <b>●</b>}
+                <button key={tab} type="button" className={activeTab === tab ? "is-active" : ""} onClick={() => navigateFromMenu(tab, "companion-active-view-anchor")}>
+                  <span aria-hidden="true">{icon}</span><span>{label}</span>{activeTab === tab && <b>●</b>}
                 </button>
               ))}
             </nav>
 
+            <div className="hamburger-separator" aria-hidden="true" />
             <button
               type="button"
               className="hamburger-logout"
@@ -2297,13 +2314,15 @@ function App() {
         </div>
       )}
 
+        <div id="companion-active-view-anchor" className="active-view-anchor" />
         {activePlayer && <ChallengePopup roomId={joinedRoom.id} playerId={activePlayer.id} onOpenArena={() => { setActiveTab("PVP"); setMenuOpen(false); }} />}
 
         {activePlayer && activeTab === "SHOP" && <ArenaPanel roomId={joinedRoom.id} playerId={activePlayer.id} mode="SHOP" />}
         {activePlayer && activeTab === "INVENTORY" && <ArenaPanel roomId={joinedRoom.id} playerId={activePlayer.id} mode="INVENTORY" />}
         {activePlayer && activeTab === "PVP" && <ArenaPanel roomId={joinedRoom.id} playerId={activePlayer.id} mode="PVP" />}
         {activePlayer && activeTab === "PVE" && <ArenaPanel roomId={joinedRoom.id} playerId={activePlayer.id} mode="PVE" />}
-        {["SHOP","INVENTORY","PVP","PVE"].includes(activeTab) && !activePlayer && <section style={panelStyle}><p>Az aréna és a shop használatához előbb lépj be játékosként.</p></section>}
+        {activePlayer && activeTab === "PIGGY" && <PiggyBankPanel roomId={joinedRoom.id} activePlayer={activePlayer} players={players} />}
+        {["SHOP","INVENTORY","PVP","PVE","PIGGY"].includes(activeTab) && !activePlayer && <section style={panelStyle}><p>Az aréna és a shop használatához előbb lépj be játékosként.</p></section>}
 
 		{activeTab === "NORMAL" && (
 		  <section style={{ marginTop: 24 }}>

@@ -28,7 +28,7 @@ function capDefense(loadout:BattleLoadout){
   return Math.min(5,Math.floor(total/4));
 }
 function randomItem(type:"WEAPON"|"HEAL"): ShopItem {
-  const pool=shopCatalog.filter(item=>item.type===type);
+  const pool=shopCatalog.filter(item=>item.type===type && item.category!=="18+ legendás relikviák");
   return pick(pool);
 }
 export function rollBattleBonus(): BattleLoadout {
